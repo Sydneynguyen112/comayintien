@@ -10,7 +10,7 @@ export interface Profile {
   full_name: string;
   email: string;
   phone: string | null;
-  role: "admin" | "mentor" | "student";
+  role: "admin" | "mentor" | "student" | "super_admin";
   mentor_id: string | null;
   avatar_url: string | null;
   classification: string | null;
@@ -92,11 +92,22 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
 
   if (existing) {
     signIn(existing.id);
-    // User cũ (LMS hoặc comay) — đảm bảo có apps_access cho comay app
-    await supabase.from("apps_access").upsert(
-      { user_id: existing.id, app: "comay" },
-      { onConflict: "user_id,app" },
-    );
+    // User cũ (LMS hoặc comay) — đảm bảo có apps_access cho comay.
+    // Nếu chưa có row → insert pending (admin duyệt sau).
+    // Nếu đã có row → giữ nguyên status.
+    const { data: existingAccess } = await supabase
+      .from("apps_access")
+      .select("status")
+      .eq("user_id", existing.id)
+      .eq("app", "comay")
+      .maybeSingle();
+    if (!existingAccess) {
+      await supabase.from("apps_access").insert({
+        user_id: existing.id,
+        app: "comay",
+        status: "pending",
+      });
+    }
     return { profile: existing as Profile, isNewUser: false };
   }
 
@@ -138,17 +149,12 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
 
   if (newProfile) {
     signIn(newProfile.id);
-    // Cấp quyền comay + money_machine feature cho user mới
-    await Promise.all([
-      supabase.from("apps_access").upsert(
-        { user_id: newProfile.id, app: "comay" },
-        { onConflict: "user_id,app" },
-      ),
-      supabase.from("user_features").upsert(
-        { user_id: newProfile.id, feature: "money_machine" },
-        { onConflict: "user_id,feature" },
-      ),
-    ]);
+    // User mới — insert apps_access với status='pending', admin duyệt sau
+    await supabase.from("apps_access").insert({
+      user_id: newProfile.id,
+      app: "comay",
+      status: "pending",
+    });
     return { profile: newProfile as Profile, isNewUser: true };
   }
 

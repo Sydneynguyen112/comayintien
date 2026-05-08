@@ -62,21 +62,16 @@ export default function RegisterPage() {
       return;
     }
 
-    // Cấp quyền apps_access + money_machine feature cho user comay
-    await Promise.all([
-      supabase.from("apps_access").upsert(
-        { user_id: profile.id, app: "comay" },
-        { onConflict: "user_id,app" },
-      ),
-      supabase.from("user_features").upsert(
-        { user_id: profile.id, feature: "money_machine" },
-        { onConflict: "user_id,feature" },
-      ),
-    ]);
+    // Tạo apps_access pending — admin sẽ duyệt sau khi review
+    await supabase.from("apps_access").insert({
+      user_id: profile.id,
+      app: "comay",
+      status: "pending",
+    });
 
     localStorage.setItem("rova_current_user_id", profile.id);
     setLoading(false);
-    router.push("/onboarding");
+    router.push("/pending");
   };
 
   const handleGoogleRegister = async () => {
