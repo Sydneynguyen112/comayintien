@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Search, Users as UsersIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -221,17 +222,20 @@ export default function AdminKhachHangPage() {
                       return (
                         <TableRow key={profile.id}>
                           <TableCell>
-                            <div className="flex items-center gap-3">
+                            <Link
+                              href={`/admin/khach-hang/${profile.id}`}
+                              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                            >
                               <Avatar className="h-8 w-8">
                                 {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
                                 <AvatarFallback className="bg-gold/20 text-gold text-xs">
                                   {initials}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-foreground">
+                              <span className="font-medium text-foreground hover:text-gold transition-colors">
                                 {profile.full_name}
                               </span>
-                            </div>
+                            </Link>
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {profile.email}
