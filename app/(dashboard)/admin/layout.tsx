@@ -6,7 +6,7 @@ import { useCurrentUser } from "@/lib/auth";
 import { touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
 
-export default function AdminCrmLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;

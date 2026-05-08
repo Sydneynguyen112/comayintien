@@ -33,6 +33,7 @@ import {
 import { UserRowActions, type UserStatus } from "@/components/admin/user-row-actions";
 import { MentorAssignSelect } from "@/components/admin/mentor-assign-select";
 import { ActivityTimeline } from "@/components/admin/activity-timeline";
+import { RoleChangeSelect } from "@/components/admin/role-change-select";
 
 interface AccessRow {
   user_id: string;
@@ -250,6 +251,16 @@ export default function AdminUserDetailPage() {
                   userId={profile.id}
                   currentStatus={status}
                   adminId={admin.id}
+                  onChanged={loadData}
+                />
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <RoleChangeSelect
+                  userId={profile.id}
+                  currentRole={profile.role}
+                  adminId={admin.id}
+                  adminRole={admin.role}
                   onChanged={loadData}
                 />
               </div>

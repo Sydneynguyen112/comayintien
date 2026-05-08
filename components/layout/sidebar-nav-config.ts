@@ -29,11 +29,8 @@ export const studentNav: NavItem[] = studentMentorNav("student");
 export const mentorNav: NavItem[] = studentMentorNav("mentor");
 
 export const adminNav: NavItem[] = [
-  { href: "/admin/co-may/tong-quan", label: "Tổng quan Cỗ Máy", icon: LayoutDashboard },
-  { href: "/admin/crm", label: "CRM", icon: ChartLine },
+  { href: "/admin/crm", label: "CRM Dashboard", icon: ChartLine },
   { href: "/admin/khach-hang", label: "Khách hàng & Mentor", icon: Users },
-  { href: "/admin/co-may/quan-ly", label: "Cỗ Máy chi tiết", icon: Settings },
-  { href: "/admin/co-may/lich-su", label: "Nhật ký hoạt động", icon: FileBarChart },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
 ];
 

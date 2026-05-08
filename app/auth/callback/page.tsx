@@ -28,7 +28,7 @@ export default function AuthCallbackPage() {
           return;
         }
         if (profile.role === "admin" || profile.role === "super_admin")
-          router.push("/admin/co-may/tong-quan");
+          router.push("/admin/crm");
         else if (profile.role === "mentor") router.push("/mentor/co-may/tong-quan");
         else router.push("/student/co-may/tong-quan");
       } catch {
