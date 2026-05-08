@@ -22,11 +22,15 @@ export default function AuthCallbackPage() {
         const { profile, isNewUser } = result;
         setStatus(`Xin chào ${profile.full_name}! Đang chuyển hướng...`);
 
-        if (isNewUser && profile.role === "student") {
-          router.push("/onboarding");
-        } else if (profile.role === "admin") router.push("/admin");
-        else if (profile.role === "mentor") router.push("/mentor");
-        else router.push("/student");
+        // User mới luôn vào /pending vì status='pending', admin duyệt sau
+        if (isNewUser) {
+          router.push("/pending");
+          return;
+        }
+        if (profile.role === "admin" || profile.role === "super_admin")
+          router.push("/admin/co-may/tong-quan");
+        else if (profile.role === "mentor") router.push("/mentor/co-may/tong-quan");
+        else router.push("/student/co-may/tong-quan");
       } catch {
         setStatus("Có lỗi xảy ra. Đang chuyển hướng...");
         setTimeout(() => router.push("/sign-in"), 2000);

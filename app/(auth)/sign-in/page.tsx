@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { LogIn, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signInWithEmail, signInWithGoogle } from "@/lib/auth";
 
-export default function SignInPage() {
+function SignInPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
   const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function dashboardPath(role: string): string {
+    if (role === "admin" || role === "super_admin") return "/admin/co-may/tong-quan";
+    if (role === "mentor") return "/mentor/co-may/tong-quan";
+    return "/student/co-may/tong-quan";
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +38,7 @@ export default function SignInPage() {
     }
 
     setLoading(false);
-
-    if (profile.role === "admin") router.push("/admin");
-    else if (profile.role === "mentor") router.push("/mentor");
-    else router.push("/student");
+    router.push(next || dashboardPath(profile.role));
   };
 
   const handleGoogleSignIn = async () => {
@@ -54,7 +59,7 @@ export default function SignInPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Đăng nhập</h1>
         <p className="mt-2 text-muted-foreground">
-          Chào mừng bạn quay lại ROVA
+          Chào mừng quay lại Cỗ Máy In Tiền
         </p>
       </div>
 
@@ -179,5 +184,13 @@ export default function SignInPage() {
         </Link>
       </p>
     </motion.div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="text-muted-foreground">Đang tải...</div>}>
+      <SignInPageInner />
+    </Suspense>
   );
 }

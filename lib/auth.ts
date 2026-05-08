@@ -21,13 +21,6 @@ export interface Profile {
   created_at: string;
 }
 
-// Default emails per role for dev fallback
-const DEFAULT_EMAIL_BY_ROLE: Record<string, string> = {
-  admin: "nguyennhunguyen112@gmail.com",
-  mentor: "nguyennhunguyen112@gmail.com",
-  student: "khangvyvy@gmail.com",
-};
-
 export function signIn(userId: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, userId);
@@ -167,9 +160,10 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
 
 /**
  * Hook to get the currently logged-in user from Supabase.
- * Checks: Supabase Auth session → localStorage → fallback role.
+ * Checks: Supabase Auth session → localStorage. Returns null nếu chưa đăng nhập.
+ * `_fallbackRole` arg giữ lại để tương thích call sites hiện có; không còn auto-login dev account.
  */
-export function useCurrentUser(fallbackRole: string | null = null): Profile | null {
+export function useCurrentUser(_fallbackRole: string | null = null): Profile | null {
   const [user, setUser] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -191,7 +185,7 @@ export function useCurrentUser(fallbackRole: string | null = null): Profile | nu
         }
       }
 
-      // 2. Try stored ID from localStorage
+      // 2. Try stored ID from localStorage (email login flow)
       const storedId = getStoredUserId();
       if (storedId) {
         const { data } = await supabase
@@ -203,23 +197,8 @@ export function useCurrentUser(fallbackRole: string | null = null): Profile | nu
           setUser(data as Profile);
           return;
         }
-      }
-
-      // 3. Fallback: load by default email for role (dev only)
-      if (fallbackRole) {
-        const email = DEFAULT_EMAIL_BY_ROLE[fallbackRole];
-        if (email) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("email", email)
-            .single();
-          if (!cancelled && data) {
-            localStorage.setItem(STORAGE_KEY, data.id);
-            setUser(data as Profile);
-            return;
-          }
-        }
+        // Stored ID không hợp lệ — clear để tránh stuck
+        localStorage.removeItem(STORAGE_KEY);
       }
 
       if (!cancelled) setUser(null);
@@ -245,7 +224,7 @@ export function useCurrentUser(fallbackRole: string | null = null): Profile | nu
         window.removeEventListener("rova:profile-updated", onProfileUpdate);
       }
     };
-  }, [fallbackRole]);
+  }, []);
 
   return user;
 }
