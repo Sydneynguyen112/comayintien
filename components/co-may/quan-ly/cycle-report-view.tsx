@@ -23,7 +23,7 @@ const DECISION_LABEL: Record<string, string> = {
   close: "ĐÓNG",
 };
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 export function CycleReportView({
   role,

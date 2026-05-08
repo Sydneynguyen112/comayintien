@@ -15,7 +15,7 @@ const DAY_MS = 86400_000;
 const VN_DAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 interface Props {
-  role: "student" | "mentor" | "admin";
+  role: "client" | "mentor" | "admin";
   machines: Machine[];
   tx: MachineTransaction[];
 }

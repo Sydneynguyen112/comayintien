@@ -10,10 +10,10 @@ import {
 } from "@/lib/co-may/mock-data";
 import { ActionLogView } from "./action-log-view";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 const SCOPE_LABEL: Record<RoleSlug, string> = {
-  student: "Lịch sử của bạn",
+  client: "Lịch sử của bạn",
   mentor: "Lịch sử các mentee",
   admin: "Lịch sử toàn hệ thống",
 };

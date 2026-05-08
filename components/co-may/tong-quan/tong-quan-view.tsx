@@ -11,7 +11,7 @@ import {
 import { getSetup, subscribe } from "@/lib/co-may/setup-store";
 import { PhongDieuHanh } from "./phong-dieu-hanh";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 export function TongQuanView({ role }: { role: RoleSlug }) {
   const user = useCurrentUser(role);

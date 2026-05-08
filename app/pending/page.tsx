@@ -25,7 +25,7 @@ export default function PendingPage() {
         return;
       }
       if (s === "approved") {
-        router.replace(user.role === "mentor" ? "/mentor/co-may/tong-quan" : "/student/co-may/tong-quan");
+        router.replace(user.role === "mentor" ? "/mentor/co-may/tong-quan" : "/client/co-may/tong-quan");
         return;
       }
       setStatus(s === "locked" ? "locked" : "pending");

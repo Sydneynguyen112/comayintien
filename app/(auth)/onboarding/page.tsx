@@ -237,7 +237,7 @@ export default function OnboardingPage() {
     } catch (err) {
       console.error("Failed to save classification:", err);
     }
-    router.push("/student");
+    router.push("/client/co-may/tong-quan");
   };
 
   return (

@@ -14,10 +14,10 @@ import { MachineCard } from "./machine-card";
 import { ClosedMachineCard } from "./closed-machine-card";
 import { CreateMachineDialog } from "./create-machine-dialog";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 const SCOPE_LABEL: Record<RoleSlug, string> = {
-  student: "Cỗ máy của bạn",
+  client: "Cỗ máy của bạn",
   mentor: "Cỗ máy của mentee",
   admin: "Tất cả cỗ máy",
 };
@@ -53,7 +53,7 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
     );
   }
 
-  const canCreate = role === "student";
+  const canCreate = role === "client";
 
   // Reserve pool = totalCapital - sum(active machine.capital của chính user, không phải scope)
   let reservePool: number | undefined;

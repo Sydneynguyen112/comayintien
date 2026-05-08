@@ -21,7 +21,7 @@ function SignInPageInner() {
   function dashboardPath(role: string): string {
     if (role === "admin" || role === "super_admin") return "/admin/crm";
     if (role === "mentor") return "/mentor/co-may/tong-quan";
-    return "/student/co-may/tong-quan";
+    return "/client/co-may/tong-quan";
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

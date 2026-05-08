@@ -8,7 +8,7 @@ import { hydrateFromCloud } from "@/lib/co-may/cloud-sync";
 import { getAccessStatus, touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
 
-export default function StudentCoMayLayout({
+export default function ClientCoMayLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -48,5 +48,5 @@ export default function StudentCoMayLayout({
       </div>
     );
   }
-  return <CoMayShell role="student">{children}</CoMayShell>;
+  return <CoMayShell role="client">{children}</CoMayShell>;
 }

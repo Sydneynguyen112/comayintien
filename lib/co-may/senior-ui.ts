@@ -1,12 +1,12 @@
 // Senior-friendly UI helpers cho Cỗ Máy module.
-// Áp dụng khi role = "student" (target audience u40-60). Admin/mentor giữ dense view.
+// Áp dụng khi role = "client" (URL slug, target audience u40-60). Admin/mentor giữ dense view.
 //
 // Triết lý: bump font-size, tap target, contrast — không đổi layout/structure.
 
-export type Role = "student" | "mentor" | "admin";
+export type Role = "client" | "mentor" | "admin";
 
 export function isSeniorMode(role: Role | string | null | undefined): boolean {
-  return role === "student";
+  return role === "client";
 }
 
 /** Cycle helper — return một trong 2 class strings tuỳ flag. */

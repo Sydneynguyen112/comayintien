@@ -6,7 +6,7 @@ import { LayoutDashboard, Settings, LineChart, FileBarChart, type LucideIcon } f
 import { cn } from "@/lib/utils";
 import { isSeniorMode } from "@/lib/co-may/senior-ui";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 interface SubNavTab {
   segment: string;

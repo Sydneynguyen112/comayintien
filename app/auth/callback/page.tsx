@@ -30,7 +30,7 @@ export default function AuthCallbackPage() {
         if (profile.role === "admin" || profile.role === "super_admin")
           router.push("/admin/crm");
         else if (profile.role === "mentor") router.push("/mentor/co-may/tong-quan");
-        else router.push("/student/co-may/tong-quan");
+        else router.push("/client/co-may/tong-quan");
       } catch {
         setStatus("Có lỗi xảy ra. Đang chuyển hướng...");
         setTimeout(() => router.push("/sign-in"), 2000);

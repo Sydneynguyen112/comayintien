@@ -16,11 +16,10 @@ function SetupPageInner() {
   useEffect(() => {
     if (!user) return;
     if (mode === "initial" && hasCompletedSetup(user.id, user.role)) {
-      router.replace("/student/co-may/tong-quan");
+      router.replace("/client/co-may/tong-quan");
     }
     if (mode === "allocate" && !hasCompletedSetup(user.id, user.role)) {
-      // Chưa setup mà cố allocate → đẩy về setup initial
-      router.replace("/student/co-may/setup");
+      router.replace("/client/co-may/setup");
     }
   }, [user, mode, router]);
 
@@ -39,7 +38,7 @@ function SetupPageInner() {
     reservePool = Math.max(0, (setup?.totalCapital ?? 0) - allocated);
   }
 
-  return <SetupWizard userId={user.id} role="student" mode={mode} reservePool={reservePool} />;
+  return <SetupWizard userId={user.id} role="client" mode={mode} reservePool={reservePool} />;
 }
 
 export default function StudentCoMaySetupPage() {

@@ -31,7 +31,7 @@ const usd = new Intl.NumberFormat("en-US", {
 });
 
 interface Props {
-  role: "student" | "mentor" | "admin";
+  role: "client" | "mentor" | "admin";
   userId: string;
   totalCapitalSetup: number;
   /** Tiền đã nạp lại từ pool đã rút — trừ vào display "Dòng tiền đã rút". */
@@ -375,7 +375,7 @@ export function PhongDieuHanh({
         <SecondaryStat label="Tổng vốn doanh chủ" value={usd.format(Math.max(totalCapitalSetup, totalAllocated + reserve))} senior={senior} />
         <SecondaryStat label="Vốn đã phân bổ" value={usd.format(totalAllocated)} senior={senior} />
         <SecondaryStat label="Vốn dự trữ" value={usd.format(reserve)} senior={senior} />
-        {role === "student" && (
+        {role === "client" && (
           <div className="flex md:justify-end">
             <Button
               variant="outline"

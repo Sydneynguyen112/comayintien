@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { id } = await params;
   const { owner } = await searchParams;
-  return <CloseCycleWizard role="student" machineId={id} ownerId={owner} />;
+  return <CloseCycleWizard role="client" machineId={id} ownerId={owner} />;
 }

@@ -39,7 +39,7 @@ const usd = new Intl.NumberFormat("en-US", {
 
 const DAY_MS = 86400_000;
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 const SIGNAL_LABEL: Record<string, string> = {
   self: "Tự sản xuất",
@@ -136,7 +136,7 @@ export function MachineDetailView({
   const wr = allTrades.length > 0 ? Math.round((wins / allTrades.length) * 100) : 0;
   const days = Math.max(1, Math.floor((Date.now() - cycleStartTs) / DAY_MS));
 
-  const readOnly = role !== "student" || resolvedOwner !== user.id;
+  const readOnly = role !== "client" || resolvedOwner !== user.id;
 
   return (
     <div className="space-y-5">

@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 import { isSeniorMode, seniorCx } from "@/lib/co-may/senior-ui";
 import { SubNav } from "./sub-nav";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 const ROLE_LABEL: Record<RoleSlug, string> = {
-  student: "View học viên",
+  client: "View khách hàng",
   mentor: "View mentor — đọc dữ liệu mentee",
   admin: "View admin — toàn hệ thống",
 };
@@ -42,7 +42,7 @@ export function CoMayShell({
         </div>
       </header>
 
-      {role !== "admin" && <SubNav role={role} />}
+      {role !== "admin" && <SubNav role={role as "client" | "mentor"} />}
 
       <div className="pt-2">{children}</div>
     </div>

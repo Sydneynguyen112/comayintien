@@ -155,7 +155,7 @@ export function LockedFeature({ title, description }: LockedFeatureProps) {
                         )}
                       </div>
                       {course.price ? (
-                        <Link href={`/student/checkout/${course.id}`}>
+                        <Link href={`/client/checkout/${course.id}`}>
                           <Button className="bg-gold hover:bg-gold/90 text-black font-semibold">
                             Đăng ký ngay
                           </Button>

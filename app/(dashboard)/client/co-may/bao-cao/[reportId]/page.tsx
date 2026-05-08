@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { reportId } = await params;
   const { owner } = await searchParams;
-  return <CycleReportView role="student" reportId={reportId} ownerId={owner} />;
+  return <CycleReportView role="client" reportId={reportId} ownerId={owner} />;
 }

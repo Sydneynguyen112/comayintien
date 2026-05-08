@@ -10,7 +10,7 @@ import {
 import { subscribe } from "@/lib/co-may/setup-store";
 import { HieuSuatSection } from "@/components/co-may/tong-quan/hieu-suat-section";
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 export function HieuSuatView({ role }: { role: RoleSlug }) {
   const user = useCurrentUser(role);

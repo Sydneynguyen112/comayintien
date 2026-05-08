@@ -36,7 +36,7 @@ const STEPS = [
   { idx: 4, label: "Quyết định" },
 ] as const;
 
-type RoleSlug = "student" | "mentor" | "admin";
+type RoleSlug = "client" | "mentor" | "admin";
 
 export function CloseCycleWizard({
   role,

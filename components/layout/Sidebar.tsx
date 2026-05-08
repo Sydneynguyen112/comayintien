@@ -18,9 +18,8 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getNavConfig, backToAdminItem, type NavItem } from "./sidebar-nav-config";
 
 function isItemActive(item: NavItem, pathname: string): boolean {
-  // Dashboard root pages match exact only
   const isRootDashboard =
-    item.href === "/student" || item.href === "/mentor" || item.href === "/admin";
+    item.href === "/client" || item.href === "/mentor" || item.href === "/admin";
   if (isRootDashboard) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(item.href + "/");
 }

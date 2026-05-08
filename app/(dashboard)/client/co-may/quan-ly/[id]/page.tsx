@@ -8,5 +8,5 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const sp = useSearchParams();
   const owner = sp.get("owner") ?? undefined;
-  return <MachineDetailView role="student" machineId={id} ownerId={owner} />;
+  return <MachineDetailView role="client" machineId={id} ownerId={owner} />;
 }
