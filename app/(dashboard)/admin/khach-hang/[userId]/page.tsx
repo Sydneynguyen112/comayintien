@@ -98,11 +98,12 @@ export default function AdminUserDetailPage() {
   const [access, setAccess] = useState<AccessRow | null>(null);
   const [machines, setMachines] = useState<MachineRow[]>([]);
   const [transactions, setTransactions] = useState<TxRow[]>([]);
+  const [setupCapital, setSetupCapital] = useState(0);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
     setLoading(true);
-    const [{ data: p }, { data: a }, { data: m }, { data: tx }] = await Promise.all([
+    const [{ data: p }, { data: a }, { data: m }, { data: tx }, { data: setup }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).single(),
       supabase
         .from("apps_access")
@@ -111,19 +112,25 @@ export default function AdminUserDetailPage() {
         .eq("app", "comay")
         .maybeSingle(),
       supabase
-        .from("machines")
+        .from("comay_machines")
         .select("id, name, capital, current_anchor, status, method, created_at, cycle_started_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
       supabase
-        .from("machine_tx")
+        .from("comay_transactions")
         .select("id, machine_id, type, amount, created_at")
         .eq("user_id", userId),
+      supabase
+        .from("comay_setup")
+        .select("total_capital")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
     setProfile(p as Profile);
     setAccess((a ?? null) as AccessRow | null);
     setMachines((m ?? []) as MachineRow[]);
     setTransactions((tx ?? []) as TxRow[]);
+    setSetupCapital((setup?.total_capital as number | undefined) ?? 0);
     setLoading(false);
   }
 
@@ -137,19 +144,16 @@ export default function AdminUserDetailPage() {
     const totalCapital = activeMachines.reduce((s, m) => s + (m.capital || 0), 0);
     const withdrawn = transactions
       .filter((t) => t.type === "withdraw")
-      .reduce((s, t) => s + (t.amount || 0), 0);
-    const deposited = transactions
-      .filter((t) => t.type === "deposit")
-      .reduce((s, t) => s + (t.amount || 0), 0);
+      .reduce((s, t) => s + Math.abs(t.amount || 0), 0);
     return {
       machineCount: machines.length,
       activeMachineCount: activeMachines.length,
       totalCapital,
       withdrawn,
-      deposited,
+      deposited: setupCapital,
       txCount: transactions.length,
     };
-  }, [machines, transactions]);
+  }, [machines, transactions, setupCapital]);
 
   if (loading || !admin) {
     return (

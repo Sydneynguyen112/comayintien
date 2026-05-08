@@ -84,11 +84,12 @@ export default function AdminCrmPage() {
   const [machines, setMachines] = useState<MachineLite[]>([]);
   const [transactions, setTransactions] = useState<TxLite[]>([]);
   const [activity, setActivity] = useState<ActivityLite[]>([]);
+  const [setupCapitalTotal, setSetupCapitalTotal] = useState(0);
 
   useEffect(() => {
     (async () => {
       const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const [p, a, m, tx, ev] = await Promise.all([
+      const [p, a, m, tx, ev, setups] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, full_name, email, role, created_at")
@@ -97,18 +98,24 @@ export default function AdminCrmPage() {
           .from("apps_access")
           .select("user_id, status, last_seen_at")
           .eq("app", "comay"),
-        supabase.from("machines").select("id, user_id, status, method"),
-        supabase.from("machine_tx").select("user_id, type, amount, created_at"),
+        supabase.from("comay_machines").select("id, user_id, status, method"),
+        supabase.from("comay_transactions").select("user_id, type, amount, created_at"),
         supabase
           .from("activity_events")
           .select("user_id, type, created_at")
           .gte("created_at", since30d),
+        supabase.from("comay_setup").select("total_capital"),
       ]);
       setProfiles((p.data ?? []) as ProfileLite[]);
       setAccess((a.data ?? []) as AccessLite[]);
       setMachines((m.data ?? []) as MachineLite[]);
       setTransactions((tx.data ?? []) as TxLite[]);
       setActivity((ev.data ?? []) as ActivityLite[]);
+      const totalCap = (setups.data ?? []).reduce(
+        (s: number, r: { total_capital?: number }) => s + (r.total_capital || 0),
+        0,
+      );
+      setSetupCapitalTotal(totalCap);
       setLoading(false);
     })();
   }, []);
@@ -122,10 +129,8 @@ export default function AdminCrmPage() {
     const activeMachines = machines.filter((m) => m.status !== "closed").length;
     const lifetimeWithdrawn = transactions
       .filter((t) => t.type === "withdraw")
-      .reduce((s, t) => s + (t.amount || 0), 0);
-    const lifetimeDeposited = transactions
-      .filter((t) => t.type === "deposit")
-      .reduce((s, t) => s + (t.amount || 0), 0);
+      .reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+    const lifetimeDeposited = setupCapitalTotal;
     const active7d = access.filter((a) => daysSince(a.last_seen_at) <= 7).length;
     const pending = access.filter((a) => a.status === "pending").length;
     return {
@@ -138,7 +143,7 @@ export default function AdminCrmPage() {
       active7d,
       pending,
     };
-  }, [profiles, access, machines, transactions]);
+  }, [profiles, access, machines, transactions, setupCapitalTotal]);
 
   // 12 weeks customer growth
   const weeklyGrowth = useMemo(() => {
@@ -159,21 +164,21 @@ export default function AdminCrmPage() {
     return weeks;
   }, [profiles]);
 
-  // 6 months money flow
+  // 6 months money flow — withdrawals only (schema không có deposit type)
   const monthlyMoney = useMemo(() => {
-    const months: { key: string; label: string; deposit: number; withdraw: number }[] = [];
+    const months: { key: string; label: string; withdraw: number }[] = [];
     const today = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = d.toISOString().slice(0, 7);
-      months.push({ key, label: `T${d.getMonth() + 1}`, deposit: 0, withdraw: 0 });
+      months.push({ key, label: `T${d.getMonth() + 1}`, withdraw: 0 });
     }
     const byMonth = new Map(months.map((m) => [m.key, m]));
     transactions.forEach((t) => {
+      if (t.type !== "withdraw") return;
       const m = byMonth.get(monthKey(t.created_at));
       if (!m) return;
-      if (t.type === "withdraw") m.withdraw += t.amount || 0;
-      if (t.type === "deposit") m.deposit += t.amount || 0;
+      m.withdraw += Math.abs(t.amount || 0);
     });
     return months;
   }, [transactions]);
@@ -193,7 +198,7 @@ export default function AdminCrmPage() {
     const totals = new Map<string, number>();
     transactions.forEach((t) => {
       if (t.type !== "withdraw") return;
-      totals.set(t.user_id, (totals.get(t.user_id) ?? 0) + (t.amount || 0));
+      totals.set(t.user_id, (totals.get(t.user_id) ?? 0) + Math.abs(t.amount || 0));
     });
     const profileMap = new Map(profiles.map((p) => [p.id, p]));
     return Array.from(totals.entries())
@@ -299,12 +304,11 @@ export default function AdminCrmPage() {
 
           <Card>
             <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Dòng tiền 6 tháng</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Đã rút theo tháng</h3>
               <CrmBarChart
                 labels={monthlyMoney.map((m) => m.label)}
                 series={[
                   { label: "Đã rút", color: "#3B6C4F", values: monthlyMoney.map((m) => m.withdraw) },
-                  { label: "Đã nạp", color: "#B8512E", values: monthlyMoney.map((m) => m.deposit) },
                 ]}
                 formatValue={(n) => formatVnd(n)}
               />
