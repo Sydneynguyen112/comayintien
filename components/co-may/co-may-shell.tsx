@@ -42,7 +42,7 @@ export function CoMayShell({
         </div>
       </header>
 
-      <SubNav role={role} />
+      {role !== "admin" && <SubNav role={role} />}
 
       <div className="pt-2">{children}</div>
     </div>
