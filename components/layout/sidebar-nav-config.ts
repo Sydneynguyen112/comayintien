@@ -6,7 +6,6 @@ import {
   Users,
   ChartLine,
   Coins,
-  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -36,13 +35,6 @@ export const adminNav: NavItem[] = [
   { href: "/client/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
 ];
-
-// Item prepend khi admin/super_admin đang ở /client/* hoặc /mentor/* — escape về admin
-export const backToAdminItem: NavItem = {
-  href: "/admin/crm",
-  label: "← Quay lại Admin",
-  icon: ShieldCheck,
-};
 
 export function getNavConfig(pathname: string): {
   items: NavItem[];

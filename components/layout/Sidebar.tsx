@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser, signOut } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { getNavConfig, backToAdminItem, type NavItem } from "./sidebar-nav-config";
+import { getNavConfig, adminNav, type NavItem } from "./sidebar-nav-config";
 
 function isItemActive(item: NavItem, pathname: string): boolean {
   const isRootDashboard =
@@ -34,15 +34,15 @@ export function Sidebar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { items: baseItems, role, fallbackRole } = getNavConfig(pathname);
-  const currentUser = useCurrentUser(fallbackRole);
+  const navConfig = getNavConfig(pathname);
+  const currentUser = useCurrentUser(navConfig.fallbackRole);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
-  // Admin/super_admin xem trang student/mentor → prepend "Quay lại Admin" để escape
-  const isAdminInPersonalView =
-    (currentUser?.role === "admin" || currentUser?.role === "super_admin") &&
-    !pathname.startsWith("/admin");
-  const items = isAdminInPersonalView ? [backToAdminItem, ...baseItems] : baseItems;
+  // Admin/super_admin LUÔN giữ admin sidebar — kể cả khi xem /client/* hoặc /mentor/*
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+  const items = isAdmin ? adminNav : navConfig.items;
+  const role = isAdmin ? "Admin" : navConfig.role;
+  const fallbackRole = navConfig.fallbackRole;
 
   // Auto-expand any branch whose descendant is active
   useEffect(() => {
