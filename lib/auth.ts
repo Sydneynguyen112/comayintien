@@ -1,0 +1,241 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+const STORAGE_KEY = "rova_current_user_id";
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  role: "admin" | "mentor" | "student";
+  mentor_id: string | null;
+  avatar_url: string | null;
+  classification: string | null;
+  risk_tag: string | null;
+  discord_handle: string | null;
+  last_active_date: string;
+  created_at: string;
+}
+
+// Default emails per role for dev fallback
+const DEFAULT_EMAIL_BY_ROLE: Record<string, string> = {
+  admin: "nguyennhunguyen112@gmail.com",
+  mentor: "nguyennhunguyen112@gmail.com",
+  student: "khangvyvy@gmail.com",
+};
+
+export function signIn(userId: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, userId);
+}
+
+export async function signOut() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+  await supabase.auth.signOut();
+}
+
+export function getStoredUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(STORAGE_KEY);
+}
+
+/**
+ * Sign in with Google via Supabase OAuth
+ */
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback`
+        : undefined,
+    },
+  });
+  if (error) throw error;
+}
+
+/**
+ * Sign in with email (lookup from profiles table — for existing mock users)
+ */
+export async function signInWithEmail(email: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", email.trim().toLowerCase())
+    .single();
+
+  if (!profile) return null;
+
+  signIn(profile.id);
+  return profile as Profile;
+}
+
+/**
+ * After Google OAuth callback, ensure a profile exists in our profiles table.
+ * If new user → create profile with role "student".
+ * Returns the profile.
+ */
+export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: boolean } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Check if profile already exists
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", user.email)
+    .single();
+
+  if (existing) {
+    signIn(existing.id);
+    // User cũ (LMS hoặc comay) — đảm bảo có apps_access cho comay app
+    await supabase.from("apps_access").upsert(
+      { user_id: existing.id, app: "comay" },
+      { onConflict: "user_id,app" },
+    );
+    return { profile: existing as Profile, isNewUser: false };
+  }
+
+  // Create new profile for Google user
+  const givenName = user.user_metadata?.given_name || "";
+  const familyName = user.user_metadata?.family_name || "";
+  const fullName = familyName && givenName
+    ? `${familyName} ${givenName}`
+    : user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Học viên";
+
+  const { data: newProfile, error: insertError } = await supabase
+    .from("profiles")
+    .insert({
+      full_name: fullName,
+      email: user.email!,
+      avatar_url: user.user_metadata?.avatar_url || null,
+      role: "student",
+      classification: "newbie",
+      risk_tag: "normal",
+      source: "comay",
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error("ensureProfile insert error:", insertError);
+    // Profile may already exist with different casing — retry lookup
+    const { data: retryProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .ilike("email", user.email!)
+      .single();
+    if (retryProfile) {
+      signIn(retryProfile.id);
+      return { profile: retryProfile as Profile, isNewUser: false };
+    }
+    return null;
+  }
+
+  if (newProfile) {
+    signIn(newProfile.id);
+    // Cấp quyền comay + money_machine feature cho user mới
+    await Promise.all([
+      supabase.from("apps_access").upsert(
+        { user_id: newProfile.id, app: "comay" },
+        { onConflict: "user_id,app" },
+      ),
+      supabase.from("user_features").upsert(
+        { user_id: newProfile.id, feature: "money_machine" },
+        { onConflict: "user_id,feature" },
+      ),
+    ]);
+    return { profile: newProfile as Profile, isNewUser: true };
+  }
+
+  return null;
+}
+
+/**
+ * Hook to get the currently logged-in user from Supabase.
+ * Checks: Supabase Auth session → localStorage → fallback role.
+ */
+export function useCurrentUser(fallbackRole: string | null = null): Profile | null {
+  const [user, setUser] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      // 1. Check Supabase Auth session
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser?.email && !cancelled) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("email", authUser.email)
+          .single();
+        if (!cancelled && data) {
+          localStorage.setItem(STORAGE_KEY, data.id);
+          setUser(data as Profile);
+          return;
+        }
+      }
+
+      // 2. Try stored ID from localStorage
+      const storedId = getStoredUserId();
+      if (storedId) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", storedId)
+          .single();
+        if (!cancelled && data) {
+          setUser(data as Profile);
+          return;
+        }
+      }
+
+      // 3. Fallback: load by default email for role (dev only)
+      if (fallbackRole) {
+        const email = DEFAULT_EMAIL_BY_ROLE[fallbackRole];
+        if (email) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("email", email)
+            .single();
+          if (!cancelled && data) {
+            localStorage.setItem(STORAGE_KEY, data.id);
+            setUser(data as Profile);
+            return;
+          }
+        }
+      }
+
+      if (!cancelled) setUser(null);
+    }
+
+    load();
+
+    // Listen for auth state changes (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      load();
+    });
+
+    // Listen for profile-updated event (vd: avatar đổi từ ProfileEditor)
+    const onProfileUpdate = () => load();
+    if (typeof window !== "undefined") {
+      window.addEventListener("rova:profile-updated", onProfileUpdate);
+    }
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("rova:profile-updated", onProfileUpdate);
+      }
+    };
+  }, [fallbackRole]);
+
+  return user;
+}
