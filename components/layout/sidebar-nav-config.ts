@@ -3,6 +3,7 @@ import {
   User,
   Settings,
   FileBarChart,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -14,7 +15,7 @@ export interface NavItem {
   children?: NavItem[];
 }
 
-function comayNav(roleSlug: "student" | "mentor" | "admin"): NavItem[] {
+function studentMentorNav(roleSlug: "student" | "mentor"): NavItem[] {
   return [
     { href: `/${roleSlug}/co-may/tong-quan`, label: "Tổng quan", icon: LayoutDashboard },
     { href: `/${roleSlug}/co-may/quan-ly`, label: "Cỗ Máy chi tiết", icon: Settings },
@@ -23,9 +24,16 @@ function comayNav(roleSlug: "student" | "mentor" | "admin"): NavItem[] {
   ];
 }
 
-export const studentNav: NavItem[] = comayNav("student");
-export const mentorNav: NavItem[] = comayNav("mentor");
-export const adminNav: NavItem[] = comayNav("admin");
+export const studentNav: NavItem[] = studentMentorNav("student");
+export const mentorNav: NavItem[] = studentMentorNav("mentor");
+
+export const adminNav: NavItem[] = [
+  { href: "/admin/co-may/tong-quan", label: "Tổng quan Cỗ Máy", icon: LayoutDashboard },
+  { href: "/admin/khach-hang", label: "Khách hàng & Mentor", icon: Users },
+  { href: "/admin/co-may/quan-ly", label: "Cỗ Máy chi tiết", icon: Settings },
+  { href: "/admin/co-may/lich-su", label: "Nhật ký hoạt động", icon: FileBarChart },
+  { href: "/admin/profile", label: "Hồ sơ", icon: User },
+];
 
 export function getNavConfig(pathname: string): {
   items: NavItem[];
