@@ -22,18 +22,11 @@ import { PageTransition } from "@/components/shared/PageTransition";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
 import { UserRowActions, type UserStatus } from "@/components/admin/user-row-actions";
 import { MentorAssignSelect } from "@/components/admin/mentor-assign-select";
 import { ActivityTimeline } from "@/components/admin/activity-timeline";
 import { RoleChangeSelect } from "@/components/admin/role-change-select";
+import { CustomerMachineCard } from "@/components/admin/customer-machine-card";
 
 interface AccessRow {
   user_id: string;
@@ -59,23 +52,12 @@ interface TxRow {
   machine_id: string;
   type: string;
   amount: number;
+  note: string | null;
   created_at: string;
 }
 
-const machineStatusStyles: Record<string, string> = {
-  running: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  paused: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  closed: "bg-muted text-muted-foreground border-border",
-};
-
-const machineStatusLabels: Record<string, string> = {
-  running: "Đang chạy",
-  paused: "Tạm dừng",
-  closed: "Đã đóng",
-};
-
-function formatVnd(n: number) {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 });
+function formatUsd(n: number) {
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
 function timeSince(iso: string | null): string {
@@ -118,7 +100,7 @@ export default function AdminUserDetailPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("comay_transactions")
-        .select("id, machine_id, type, amount, created_at")
+        .select("id, machine_id, type, amount, note, created_at")
         .eq("user_id", userId),
       supabase
         .from("comay_setup")
@@ -230,9 +212,9 @@ export default function AdminUserDetailPage() {
         {/* KPI strip */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <KpiCard icon={Coins} label="Cỗ máy" value={`${kpis.activeMachineCount}/${kpis.machineCount}`} hint="Active / Tổng" tone="text-gold" />
-          <KpiCard icon={Coins} label="Tổng vốn active" value={formatVnd(kpis.totalCapital)} hint="VND" tone="text-foreground" />
-          <KpiCard icon={TrendingUp} label="Đã rút (lifetime)" value={formatVnd(kpis.withdrawn)} hint="VND" tone="text-emerald-500" />
-          <KpiCard icon={TrendingDown} label="Đã nạp (lifetime)" value={formatVnd(kpis.deposited)} hint="VND" tone="text-amber-500" />
+          <KpiCard icon={Coins} label="Tổng vốn active" value={formatUsd(kpis.totalCapital)} hint="USD" tone="text-foreground" />
+          <KpiCard icon={TrendingUp} label="Đã rút (lifetime)" value={formatUsd(kpis.withdrawn)} hint="USD" tone="text-emerald-500" />
+          <KpiCard icon={TrendingDown} label="Đã nạp (lifetime)" value={formatUsd(kpis.deposited)} hint="USD" tone="text-amber-500" />
           <KpiCard icon={Activity} label="Hoạt động cuối" value={timeSince(access?.last_seen_at ?? null)} hint="Cỗ Máy" tone="text-foreground" />
         </div>
 
@@ -286,7 +268,7 @@ export default function AdminUserDetailPage() {
           <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground">Cỗ máy của user</h3>
                 <span className="text-xs text-muted-foreground">{machines.length} máy</span>
               </div>
@@ -295,35 +277,14 @@ export default function AdminUserDetailPage() {
                   User chưa tạo cỗ máy nào.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tên</TableHead>
-                        <TableHead>Vốn</TableHead>
-                        <TableHead>Anchor</TableHead>
-                        <TableHead>Phương pháp</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead>Tạo</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {machines.map((m) => (
-                        <TableRow key={m.id}>
-                          <TableCell className="font-medium text-foreground">{m.name}</TableCell>
-                          <TableCell className="text-sm">{formatVnd(m.capital)}</TableCell>
-                          <TableCell className="text-sm text-gold">{formatVnd(m.current_anchor)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{m.method || "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={cn("text-xs", machineStatusStyles[m.status] ?? "bg-muted")}>
-                              {machineStatusLabels[m.status] ?? m.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{formatDate(m.created_at)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {machines.map((m) => (
+                    <CustomerMachineCard
+                      key={m.id}
+                      machine={m}
+                      transactions={transactions}
+                    />
+                  ))}
                 </div>
               )}
             </CardContent>

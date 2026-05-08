@@ -53,11 +53,11 @@ interface ActivityLite {
   created_at: string;
 }
 
-function formatVnd(n: number) {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return n.toString();
+function formatUsd(n: number) {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
 function weekKey(iso: string): string {
@@ -283,8 +283,8 @@ export default function AdminCrmPage() {
           <Kpi icon={UsersIcon} label="Khách hàng" value={kpis.customerCount.toString()} hint="đã duyệt" tone="text-blue-500" />
           <Kpi icon={UserCheck} label="Mentor" value={kpis.mentorCount.toString()} hint="đã duyệt" tone="text-amber-500" />
           <Kpi icon={Coins} label="Cỗ máy" value={`${kpis.activeMachines}/${kpis.totalMachines}`} hint="active / tổng" tone="text-gold" />
-          <Kpi icon={TrendingUp} label="Đã rút" value={formatVnd(kpis.lifetimeWithdrawn)} hint="lifetime" tone="text-emerald-500" />
-          <Kpi icon={TrendingDown} label="Đã nạp" value={formatVnd(kpis.lifetimeDeposited)} hint="lifetime" tone="text-orange-500" />
+          <Kpi icon={TrendingUp} label="Đã rút" value={formatUsd(kpis.lifetimeWithdrawn)} hint="lifetime" tone="text-emerald-500" />
+          <Kpi icon={TrendingDown} label="Đã nạp" value={formatUsd(kpis.lifetimeDeposited)} hint="lifetime" tone="text-orange-500" />
           <Kpi icon={Activity} label="Active 7d" value={kpis.active7d.toString()} hint="user/tuần" tone="text-foreground" />
           <Kpi icon={UsersIcon} label="Chờ duyệt" value={kpis.pending.toString()} hint="pending" tone="text-gold" />
         </div>
@@ -310,7 +310,7 @@ export default function AdminCrmPage() {
                 series={[
                   { label: "Đã rút", color: "#3B6C4F", values: monthlyMoney.map((m) => m.withdraw) },
                 ]}
-                formatValue={(n) => formatVnd(n)}
+                formatValue={(n) => formatUsd(n)}
               />
             </CardContent>
           </Card>
@@ -351,7 +351,7 @@ export default function AdminCrmPage() {
                         <div className="text-xs text-muted-foreground truncate">{tc.profile!.email}</div>
                       </div>
                       <div className="text-sm font-semibold text-emerald-500 tabular-nums">
-                        {formatVnd(tc.amount)}
+                        {formatUsd(tc.amount)}
                       </div>
                     </Link>
                   ))}
