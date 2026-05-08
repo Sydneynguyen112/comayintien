@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { UserRowActions, type UserStatus } from "@/components/admin/user-row-actions";
 import { MentorAssignSelect } from "@/components/admin/mentor-assign-select";
+import { ActivityTimeline } from "@/components/admin/activity-timeline";
 
 interface AccessRow {
   user_id: string;
@@ -266,8 +267,9 @@ export default function AdminUserDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Machines table */}
-          <Card className="lg:col-span-2">
+          {/* Machines + Activity */}
+          <div className="lg:col-span-2 space-y-4">
+          <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-foreground">Cỗ máy của user</h3>
@@ -311,6 +313,14 @@ export default function AdminUserDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Lịch sử hoạt động</h3>
+              <ActivityTimeline userId={profile.id} limit={30} />
+            </CardContent>
+          </Card>
+          </div>
         </div>
       </motion.div>
     </PageTransition>

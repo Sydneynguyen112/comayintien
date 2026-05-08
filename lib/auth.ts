@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { trackEvent } from "@/lib/activity-tracker";
 
 const STORAGE_KEY = "rova_current_user_id";
 
@@ -71,6 +72,7 @@ export async function signInWithEmail(email: string) {
   if (!profile) return null;
 
   signIn(profile.id);
+  trackEvent(profile.id, "login");
   return profile as Profile;
 }
 
@@ -92,6 +94,7 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
 
   if (existing) {
     signIn(existing.id);
+    trackEvent(existing.id, "login");
     // User cũ (LMS hoặc comay) — đảm bảo có apps_access cho comay.
     // Nếu chưa có row → insert pending (admin duyệt sau).
     // Nếu đã có row → giữ nguyên status.
@@ -149,6 +152,7 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
 
   if (newProfile) {
     signIn(newProfile.id);
+    trackEvent(newProfile.id, "login", undefined, { isNewUser: true });
     // User mới — insert apps_access với status='pending', admin duyệt sau
     await supabase.from("apps_access").insert({
       user_id: newProfile.id,

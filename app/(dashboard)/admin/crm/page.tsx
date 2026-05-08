@@ -47,6 +47,12 @@ interface TxLite {
   created_at: string;
 }
 
+interface ActivityLite {
+  user_id: string;
+  type: string;
+  created_at: string;
+}
+
 function formatVnd(n: number) {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -77,10 +83,12 @@ export default function AdminCrmPage() {
   const [access, setAccess] = useState<AccessLite[]>([]);
   const [machines, setMachines] = useState<MachineLite[]>([]);
   const [transactions, setTransactions] = useState<TxLite[]>([]);
+  const [activity, setActivity] = useState<ActivityLite[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [p, a, m, tx] = await Promise.all([
+      const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const [p, a, m, tx, ev] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, full_name, email, role, created_at")
@@ -91,11 +99,16 @@ export default function AdminCrmPage() {
           .eq("app", "comay"),
         supabase.from("machines").select("id, user_id, status, method"),
         supabase.from("machine_tx").select("user_id, type, amount, created_at"),
+        supabase
+          .from("activity_events")
+          .select("user_id, type, created_at")
+          .gte("created_at", since30d),
       ]);
       setProfiles((p.data ?? []) as ProfileLite[]);
       setAccess((a.data ?? []) as AccessLite[]);
       setMachines((m.data ?? []) as MachineLite[]);
       setTransactions((tx.data ?? []) as TxLite[]);
+      setActivity((ev.data ?? []) as ActivityLite[]);
       setLoading(false);
     })();
   }, []);
@@ -193,6 +206,32 @@ export default function AdminCrmPage() {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
   }, [transactions, profiles]);
+
+  // 30-day daily activity (page views + logins by day)
+  const dailyActivity = useMemo(() => {
+    const days: { key: string; label: string; pageViews: number; logins: number }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push({
+        key,
+        label: i % 5 === 0 || i === 0 ? `${d.getDate()}/${d.getMonth() + 1}` : "",
+        pageViews: 0,
+        logins: 0,
+      });
+    }
+    const byKey = new Map(days.map((d) => [d.key, d]));
+    activity.forEach((e) => {
+      const day = byKey.get(e.created_at.slice(0, 10));
+      if (!day) return;
+      if (e.type === "login") day.logins += 1;
+      else if (e.type === "page_view") day.pageViews += 1;
+    });
+    return days;
+  }, [activity]);
 
   // Top 10 most active (last_seen)
   const recentActive = useMemo(() => {
@@ -317,6 +356,21 @@ export default function AdminCrmPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Daily activity 30 days */}
+        <Card>
+          <CardContent className="pt-5">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Hoạt động 30 ngày qua</h3>
+            <CrmBarChart
+              labels={dailyActivity.map((d) => d.label)}
+              series={[
+                { label: "Page views", color: "#3081A4", values: dailyActivity.map((d) => d.pageViews) },
+                { label: "Logins", color: "#CD9C20", values: dailyActivity.map((d) => d.logins) },
+              ]}
+              formatValue={(n) => `${n} event`}
+            />
+          </CardContent>
+        </Card>
 
         {/* Recent activity */}
         <Card>
