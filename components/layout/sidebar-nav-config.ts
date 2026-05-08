@@ -5,6 +5,8 @@ import {
   FileBarChart,
   Users,
   ChartLine,
+  Coins,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -31,8 +33,16 @@ export const mentorNav: NavItem[] = studentMentorNav("mentor");
 export const adminNav: NavItem[] = [
   { href: "/admin/crm", label: "CRM Dashboard", icon: ChartLine },
   { href: "/admin/khach-hang", label: "Khách hàng & Mentor", icon: Users },
+  { href: "/student/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
 ];
+
+// Item prepend khi admin/super_admin đang ở /student/* hoặc /mentor/* — escape về admin
+export const backToAdminItem: NavItem = {
+  href: "/admin/crm",
+  label: "← Quay lại Admin",
+  icon: ShieldCheck,
+};
 
 export function getNavConfig(pathname: string): {
   items: NavItem[];

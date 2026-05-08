@@ -21,11 +21,15 @@ export default function StudentCoMayLayout({
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const status = await getAccessStatus(user.id, "comay");
-      if (cancelled) return;
-      if (status !== "approved") {
-        router.replace("/pending");
-        return;
+      // Admin/super_admin bypass access gate — họ luôn được vào personal view
+      const isAdmin = user.role === "admin" || user.role === "super_admin";
+      if (!isAdmin) {
+        const status = await getAccessStatus(user.id, "comay");
+        if (cancelled) return;
+        if (status !== "approved") {
+          router.replace("/pending");
+          return;
+        }
       }
       await hydrateFromCloud(user.id);
       invalidateLocalCache(user.id);

@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser, signOut } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { getNavConfig, type NavItem } from "./sidebar-nav-config";
+import { getNavConfig, backToAdminItem, type NavItem } from "./sidebar-nav-config";
 
 function isItemActive(item: NavItem, pathname: string): boolean {
   // Dashboard root pages match exact only
@@ -35,9 +35,15 @@ export function Sidebar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { items, role, fallbackRole } = getNavConfig(pathname);
+  const { items: baseItems, role, fallbackRole } = getNavConfig(pathname);
   const currentUser = useCurrentUser(fallbackRole);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  // Admin/super_admin xem trang student/mentor → prepend "Quay lại Admin" để escape
+  const isAdminInPersonalView =
+    (currentUser?.role === "admin" || currentUser?.role === "super_admin") &&
+    !pathname.startsWith("/admin");
+  const items = isAdminInPersonalView ? [backToAdminItem, ...baseItems] : baseItems;
 
   // Auto-expand any branch whose descendant is active
   useEffect(() => {
