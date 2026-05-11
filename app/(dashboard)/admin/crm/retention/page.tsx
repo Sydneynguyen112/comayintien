@@ -124,7 +124,7 @@ export default function AdminRetentionPage() {
               <div>
                 <h3 className="text-sm font-semibold">Cohort Retention · 12 tuần</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  % user mỗi cohort còn log trade ở các tuần kế tiếp. Flatten ≥30% sau M2 = PMF signal.
+                  % user mỗi cohort còn log trade ở các tuần kế tiếp. Nếu sau ~2 tháng, retention vẫn giữ ≥30% và không giảm nữa → sản phẩm đã có nhóm user trung thành.
                 </p>
               </div>
             </div>

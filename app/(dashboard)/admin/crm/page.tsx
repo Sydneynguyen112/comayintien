@@ -294,7 +294,7 @@ export default function AdminUnifiedDashboard() {
                   <Repeat className="h-4 w-4 text-gold" /> Cohort Retention · 8 tuần
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Flatten ≥30% sau M2 = PMF signal
+                  Nếu sau ~2 tháng, retention vẫn giữ ≥30% và không giảm nữa → sản phẩm đã có nhóm user trung thành
                 </p>
               </div>
             </div>

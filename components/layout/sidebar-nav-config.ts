@@ -6,10 +6,6 @@ import {
   Users,
   ChartLine,
   Coins,
-  Repeat,
-  Flame,
-  Filter,
-  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -35,7 +31,6 @@ export const mentorNav: NavItem[] = clientMentorNav("mentor");
 
 export const adminNav: NavItem[] = [
   { href: "/admin/crm", label: "Dashboard", icon: ChartLine },
-  { href: "/admin/crm/voc", label: "Voice of Customer", icon: MessageCircle },
   { href: "/admin/khach-hang", label: "Quản lý khách hàng", icon: Users },
   { href: "/client/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
