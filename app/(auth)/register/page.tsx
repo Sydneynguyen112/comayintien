@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signInWithGoogle } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { trackEvent, Events } from "@/lib/analytics";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -70,6 +71,7 @@ export default function RegisterPage() {
     });
 
     localStorage.setItem("rova_current_user_id", profile.id);
+    trackEvent(Events.USER_SIGNUP, { source: "comay", method: "email" }, profile.id);
     setLoading(false);
     router.push("/pending");
   };

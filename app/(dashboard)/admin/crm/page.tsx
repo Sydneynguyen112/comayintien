@@ -18,6 +18,7 @@ import { PageTransition } from "@/components/shared/PageTransition";
 import { Card, CardContent } from "@/components/ui/card";
 import { CrmBarChart } from "@/components/admin/crm-bar-chart";
 import { CrmMethodBreakdown } from "@/components/admin/crm-method-breakdown";
+import { NorthStarSection } from "@/components/admin/north-star-section";
 
 interface ProfileLite {
   id: string;
@@ -270,12 +271,21 @@ export default function AdminCrmPage() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
-              <span className="gold-gradient-text">CRM Dashboard</span>
+              <span className="gold-gradient-text">Dashboard</span>
             </h1>
             <p className="mt-0.5 text-muted-foreground text-sm">
               Chỉ số tổng quan để đánh giá chất lượng khách hàng và phát hiện cơ hội mới
             </p>
           </div>
+        </div>
+
+        {/* North Star Habit & Retention — fetched via React Query */}
+        <NorthStarSection />
+
+        {/* Tổng quan business legacy */}
+        <div className="flex items-center gap-2 pt-4 border-t border-border/50">
+          <ChartLine className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tổng quan business</h2>
         </div>
 
         {/* KPI strip */}

@@ -7,6 +7,7 @@ import type {
   TransactionType,
 } from "./types";
 import { cloudPush } from "./cloud-sync";
+import { trackEvent, Events } from "@/lib/analytics";
 
 // ── Deterministic PRNG (mulberry32) seeded by userId ──
 function hash(str: string): number {
@@ -258,6 +259,7 @@ export function addMachine(
   data.machines.unshift(m);
   persistDataFor(userId);
   cloudPush.machine(userId, m);
+  trackEvent(Events.TRADING_ACCOUNT_CREATED, { machine_id: m.id, name: m.name, capital: m.capital }, userId);
   return m;
 }
 
@@ -341,6 +343,12 @@ export function recordTransaction(
   data.tx.unshift(tx);
   persistDataFor(userId);
   cloudPush.tx(userId, tx);
+  // Track cardinal event cho admin dashboard
+  if (tx.type === "trade_win" || tx.type === "trade_loss") {
+    trackEvent(Events.TRADE_LOGGED, { machine_id: machineId, trade_type: tx.type, pnl: tx.amount, symbol: tx.symbol }, userId);
+  } else if (tx.type === "withdraw") {
+    trackEvent(Events.WITHDRAWAL_LOGGED, { machine_id: machineId, amount: tx.amount }, userId);
+  }
   return tx;
 }
 

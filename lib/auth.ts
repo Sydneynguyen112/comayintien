@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { trackEvent } from "@/lib/activity-tracker";
+import { trackEvent as trackDomainEvent, Events } from "@/lib/analytics";
 
 const STORAGE_KEY = "rova_current_user_id";
 
@@ -66,6 +67,7 @@ export async function signInWithEmail(email: string) {
 
   signIn(profile.id);
   trackEvent(profile.id, "login");
+  trackDomainEvent(Events.USER_LOGIN, { source: "email" }, profile.id);
   return profile as Profile;
 }
 
@@ -88,6 +90,7 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
   if (existing) {
     signIn(existing.id);
     trackEvent(existing.id, "login");
+    trackDomainEvent(Events.USER_LOGIN, { source: "google" }, existing.id);
     // User cũ (LMS hoặc comay) — đảm bảo có apps_access cho comay.
     // Nếu chưa có row → insert pending (admin duyệt sau).
     // Nếu đã có row → giữ nguyên status.
@@ -146,6 +149,8 @@ export async function ensureProfile(): Promise<{ profile: Profile; isNewUser: bo
   if (newProfile) {
     signIn(newProfile.id);
     trackEvent(newProfile.id, "login", undefined, { isNewUser: true });
+    trackDomainEvent(Events.USER_SIGNUP, { source: "comay" }, newProfile.id);
+    trackDomainEvent(Events.USER_LOGIN, { source: "google", isNewUser: true }, newProfile.id);
     // User mới — insert apps_access với status='pending', admin duyệt sau
     await supabase.from("apps_access").insert({
       user_id: newProfile.id,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/lib/auth";
 import { touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
+import { RealtimeAdminProvider } from "@/components/providers/realtime-admin-provider";
 
 export default function AdminLayout({
   children,
@@ -30,5 +31,9 @@ export default function AdminLayout({
       </div>
     );
   }
-  return <CoMayShell role="admin">{children}</CoMayShell>;
+  return (
+    <RealtimeAdminProvider>
+      <CoMayShell role="admin">{children}</CoMayShell>
+    </RealtimeAdminProvider>
+  );
 }
