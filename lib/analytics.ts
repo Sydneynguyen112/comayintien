@@ -5,6 +5,7 @@ import { getStoredUserId } from "@/lib/auth";
 
 const SESSION_KEY = "rova_session_id";
 const LAST_ACTIVITY_KEY = "rova_last_activity";
+const SESSION_STARTED_KEY = "rova_session_started_at";
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 function getSessionId(): string {
@@ -41,6 +42,23 @@ export async function trackEvent(
   } catch {
     // swallow
   }
+}
+
+/**
+ * Track session_start nếu user idle >30 phút hoặc lần đầu trong session.
+ * Gọi từ dashboard root effect mỗi navigation.
+ */
+export function maybeTrackSessionStart(userId: string) {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  const lastActivity = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0");
+  const sessionStarted = parseInt(localStorage.getItem(SESSION_STARTED_KEY) || "0");
+  const isNewSession = !sessionStarted || now - lastActivity > SESSION_IDLE_MS;
+  if (isNewSession) {
+    localStorage.setItem(SESSION_STARTED_KEY, String(now));
+    trackEvent(Events.SESSION_START, {}, userId);
+  }
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
 }
 
 export const Events = {
