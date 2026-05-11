@@ -1,261 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
-  Users as UsersIcon,
-  UserCheck,
-  Coins,
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  ChartLine,
+  ChartLine, Star, Users, Activity, UserPlus, Target, Crown, Flame, Repeat, Filter,
+  ChevronRight,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { cn, formatDate } from "@/lib/utils";
+import { format, parseISO } from "date-fns";
+import {
+  LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
+} from "recharts";
 import { PageTransition } from "@/components/shared/PageTransition";
 import { Card, CardContent } from "@/components/ui/card";
-import { CrmBarChart } from "@/components/admin/crm-bar-chart";
-import { CrmMethodBreakdown } from "@/components/admin/crm-method-breakdown";
-import { NorthStarSection } from "@/components/admin/north-star-section";
+import { KPICard } from "@/components/admin/kpi-card";
+import { ActionRequiredStrip } from "@/components/admin/action-required-strip";
+import { PriorityCustomerLists } from "@/components/admin/priority-customer-lists";
+import { CohortHeatmap } from "@/components/admin/cohort-heatmap";
+import { fetchOverviewKpis, fetchOverviewSeries } from "@/lib/admin/overview-api";
+import {
+  fetchCohortRetention, fetchActiveChurnedSeries, fetchChurnSnapshot,
+} from "@/lib/admin/retention-api";
+import {
+  fetchHabitSummary, fetchTierDistribution, TIER_META,
+} from "@/lib/admin/engagement-api";
+import { fetchSegmentMetrics, STYLE_META } from "@/lib/admin/segments-api";
+import { fetchNpsSummary } from "@/lib/admin/voc-api";
 
-interface ProfileLite {
-  id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  created_at: string;
-}
+const TIER_ORDER = ["power", "core", "casual", "at_risk", "dormant", "churned"];
 
-interface AccessLite {
-  user_id: string;
-  status: string;
-  last_seen_at: string | null;
-}
+export default function AdminUnifiedDashboard() {
+  const overviewQ = useQuery({ queryKey: ["admin", "overview", "kpis"], queryFn: fetchOverviewKpis });
+  const seriesQ = useQuery({ queryKey: ["admin", "overview", "series"], queryFn: fetchOverviewSeries });
+  const snapshotQ = useQuery({ queryKey: ["admin", "retention", "snapshot"], queryFn: fetchChurnSnapshot });
+  const cohortQ = useQuery({ queryKey: ["admin", "retention", "cohort-8"], queryFn: () => fetchCohortRetention(8) });
+  const acSeriesQ = useQuery({ queryKey: ["admin", "retention", "ac-90"], queryFn: () => fetchActiveChurnedSeries(60) });
+  const habitQ = useQuery({ queryKey: ["admin", "engagement", "habit-summary"], queryFn: fetchHabitSummary });
+  const tierQ = useQuery({ queryKey: ["admin", "engagement", "tier-distribution"], queryFn: fetchTierDistribution });
+  const styleQ = useQuery({ queryKey: ["admin", "segments", "metrics", "trading_style"], queryFn: () => fetchSegmentMetrics("trading_style") });
+  const npsQ = useQuery({ queryKey: ["admin", "voc", "nps-summary"], queryFn: () => fetchNpsSummary(90) });
 
-interface MachineLite {
-  id: string;
-  user_id: string;
-  status: string;
-  method: string | null;
-}
-
-interface TxLite {
-  user_id: string;
-  type: string;
-  amount: number;
-  created_at: string;
-}
-
-interface ActivityLite {
-  user_id: string;
-  type: string;
-  created_at: string;
-}
-
-function formatUsd(n: number) {
-  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-}
-
-function weekKey(iso: string): string {
-  const d = new Date(iso);
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-  return monday.toISOString().slice(0, 10);
-}
-
-function monthKey(iso: string): string {
-  return iso.slice(0, 7);
-}
-
-function daysSince(iso: string | null): number {
-  if (!iso) return 999;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-}
-
-export default function AdminCrmPage() {
-  const [loading, setLoading] = useState(true);
-  const [profiles, setProfiles] = useState<ProfileLite[]>([]);
-  const [access, setAccess] = useState<AccessLite[]>([]);
-  const [machines, setMachines] = useState<MachineLite[]>([]);
-  const [transactions, setTransactions] = useState<TxLite[]>([]);
-  const [activity, setActivity] = useState<ActivityLite[]>([]);
-  const [setupCapitalTotal, setSetupCapitalTotal] = useState(0);
-
-  useEffect(() => {
-    (async () => {
-      const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const [p, a, m, tx, ev, setups] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, full_name, email, role, created_at")
-          .in("role", ["student", "mentor"]),
-        supabase
-          .from("apps_access")
-          .select("user_id, status, last_seen_at")
-          .eq("app", "comay"),
-        supabase.from("comay_machines").select("id, user_id, status, method"),
-        supabase.from("comay_transactions").select("user_id, type, amount, created_at"),
-        supabase
-          .from("activity_events")
-          .select("user_id, type, created_at")
-          .gte("created_at", since30d),
-        supabase.from("comay_setup").select("total_capital"),
-      ]);
-      setProfiles((p.data ?? []) as ProfileLite[]);
-      setAccess((a.data ?? []) as AccessLite[]);
-      setMachines((m.data ?? []) as MachineLite[]);
-      setTransactions((tx.data ?? []) as TxLite[]);
-      setActivity((ev.data ?? []) as ActivityLite[]);
-      const totalCap = (setups.data ?? []).reduce(
-        (s: number, r: { total_capital?: number }) => s + (r.total_capital || 0),
-        0,
-      );
-      setSetupCapitalTotal(totalCap);
-      setLoading(false);
-    })();
-  }, []);
-
-  // ── Aggregates ─────────────────────────────────────
-  const kpis = useMemo(() => {
-    const approvedIds = new Set(access.filter((a) => a.status === "approved").map((a) => a.user_id));
-    const customers = profiles.filter((p) => p.role === "student" && approvedIds.has(p.id));
-    const mentors = profiles.filter((p) => p.role === "mentor" && approvedIds.has(p.id));
-    const totalMachines = machines.length;
-    const activeMachines = machines.filter((m) => m.status !== "closed").length;
-    const lifetimeWithdrawn = transactions
-      .filter((t) => t.type === "withdraw")
-      .reduce((s, t) => s + Math.abs(t.amount || 0), 0);
-    const lifetimeDeposited = setupCapitalTotal;
-    const active7d = access.filter((a) => daysSince(a.last_seen_at) <= 7).length;
-    const pending = access.filter((a) => a.status === "pending").length;
-    return {
-      customerCount: customers.length,
-      mentorCount: mentors.length,
-      totalMachines,
-      activeMachines,
-      lifetimeWithdrawn,
-      lifetimeDeposited,
-      active7d,
-      pending,
-    };
-  }, [profiles, access, machines, transactions, setupCapitalTotal]);
-
-  // 12 weeks customer growth
-  const weeklyGrowth = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weeks: { key: string; label: string; count: number }[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) - i * 7);
-      const key = monday.toISOString().slice(0, 10);
-      weeks.push({ key, label: `${monday.getDate()}/${monday.getMonth() + 1}`, count: 0 });
-    }
-    const byWeek = new Map(weeks.map((w) => [w.key, w]));
-    profiles.forEach((p) => {
-      const w = byWeek.get(weekKey(p.created_at));
-      if (w) w.count += 1;
-    });
-    return weeks;
-  }, [profiles]);
-
-  // 6 months money flow — withdrawals only (schema không có deposit type)
-  const monthlyMoney = useMemo(() => {
-    const months: { key: string; label: string; withdraw: number }[] = [];
-    const today = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = d.toISOString().slice(0, 7);
-      months.push({ key, label: `T${d.getMonth() + 1}`, withdraw: 0 });
-    }
-    const byMonth = new Map(months.map((m) => [m.key, m]));
-    transactions.forEach((t) => {
-      if (t.type !== "withdraw") return;
-      const m = byMonth.get(monthKey(t.created_at));
-      if (!m) return;
-      m.withdraw += Math.abs(t.amount || 0);
-    });
-    return months;
-  }, [transactions]);
-
-  // Method distribution
-  const methodEntries = useMemo(() => {
-    const counts = new Map<string, number>();
-    machines.forEach((m) => {
-      const k = m.method || "Khác";
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([method, count]) => ({ method, count }));
-  }, [machines]);
-
-  // Top 10 customers by lifetime withdrawn
-  const topCustomers = useMemo(() => {
-    const totals = new Map<string, number>();
-    transactions.forEach((t) => {
-      if (t.type !== "withdraw") return;
-      totals.set(t.user_id, (totals.get(t.user_id) ?? 0) + Math.abs(t.amount || 0));
-    });
-    const profileMap = new Map(profiles.map((p) => [p.id, p]));
-    return Array.from(totals.entries())
-      .map(([userId, amount]) => ({
-        userId,
-        amount,
-        profile: profileMap.get(userId),
-      }))
-      .filter((x) => x.profile)
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
-  }, [transactions, profiles]);
-
-  // 30-day daily activity (page views + logins by day)
-  const dailyActivity = useMemo(() => {
-    const days: { key: string; label: string; pageViews: number; logins: number }[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      days.push({
-        key,
-        label: i % 5 === 0 || i === 0 ? `${d.getDate()}/${d.getMonth() + 1}` : "",
-        pageViews: 0,
-        logins: 0,
-      });
-    }
-    const byKey = new Map(days.map((d) => [d.key, d]));
-    activity.forEach((e) => {
-      const day = byKey.get(e.created_at.slice(0, 10));
-      if (!day) return;
-      if (e.type === "login") day.logins += 1;
-      else if (e.type === "page_view") day.pageViews += 1;
-    });
-    return days;
-  }, [activity]);
-
-  // Top 10 most active (last_seen)
-  const recentActive = useMemo(() => {
-    const profileMap = new Map(profiles.map((p) => [p.id, p]));
-    return [...access]
-      .filter((a) => a.last_seen_at && profileMap.has(a.user_id))
-      .sort((a, b) => (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? ""))
-      .slice(0, 10)
-      .map((a) => ({ access: a, profile: profileMap.get(a.user_id)! }));
-  }, [access, profiles]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
-        Đang tải CRM data...
-      </div>
-    );
-  }
+  const tierPie = TIER_ORDER
+    .map((t) => {
+      const row = tierQ.data?.find((d) => d.tier === t);
+      return { tier: t, value: row?.user_count ?? 0, label: TIER_META[t]?.label ?? t };
+    })
+    .filter((d) => d.value > 0);
 
   return (
     <PageTransition>
@@ -263,8 +54,9 @@ export default function AdminCrmPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="space-y-6"
+        className="space-y-5"
       >
+        {/* Header */}
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gold/15 flex items-center justify-center">
             <ChartLine className="h-5 w-5 text-gold" />
@@ -274,181 +66,278 @@ export default function AdminCrmPage() {
               <span className="gold-gradient-text">Dashboard</span>
             </h1>
             <p className="mt-0.5 text-muted-foreground text-sm">
-              Chỉ số tổng quan để đánh giá chất lượng khách hàng và phát hiện cơ hội mới
+              Hằng ngày kiểm tra chỉ số quan trọng + khách hàng cần action
             </p>
           </div>
         </div>
 
-        {/* North Star Habit & Retention — fetched via React Query */}
-        <NorthStarSection />
+        {/* Action required — daily */}
+        <ActionRequiredStrip />
 
-        {/* Tổng quan business legacy */}
-        <div className="flex items-center gap-2 pt-4 border-t border-border/50">
-          <ChartLine className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tổng quan business</h2>
-        </div>
+        {/* Priority customer lists */}
+        <PriorityCustomerLists />
 
-        {/* KPI strip */}
+        {/* Daily health KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <Kpi icon={UsersIcon} label="Khách hàng" value={kpis.customerCount.toString()} hint="đã duyệt" tone="text-blue-500" />
-          <Kpi icon={UserCheck} label="Mentor" value={kpis.mentorCount.toString()} hint="đã duyệt" tone="text-amber-500" />
-          <Kpi icon={Coins} label="Cỗ máy" value={`${kpis.activeMachines}/${kpis.totalMachines}`} hint="active / tổng" tone="text-gold" />
-          <Kpi icon={TrendingUp} label="Đã rút" value={formatUsd(kpis.lifetimeWithdrawn)} hint="lifetime" tone="text-emerald-500" />
-          <Kpi icon={TrendingDown} label="Đã nạp" value={formatUsd(kpis.lifetimeDeposited)} hint="lifetime" tone="text-orange-500" />
-          <Kpi icon={Activity} label="Active 7d" value={kpis.active7d.toString()} hint="user/tuần" tone="text-foreground" />
-          <Kpi icon={UsersIcon} label="Chờ duyệt" value={kpis.pending.toString()} hint="pending" tone="text-gold" />
+          <KPICard
+            label="WAU Loggers ⭐"
+            icon={Star}
+            value={overviewQ.data?.wau_loggers.current ?? 0}
+            current={overviewQ.data?.wau_loggers.current}
+            previous={overviewQ.data?.wau_loggers.previous}
+            hint="≥3 trade trong 7d"
+            trendData={seriesQ.data?.wauLoggers12w}
+            loading={overviewQ.isLoading}
+            highlight
+          />
+          <KPICard
+            label="DAU"
+            icon={Users}
+            value={overviewQ.data?.dau.current ?? 0}
+            current={overviewQ.data?.dau.current}
+            previous={overviewQ.data?.dau.previous}
+            hint="vs hôm qua"
+            loading={overviewQ.isLoading}
+          />
+          <KPICard
+            label="Stickiness"
+            icon={Activity}
+            value={overviewQ.data?.stickiness.current ?? 0}
+            format="percent"
+            current={overviewQ.data?.stickiness.current}
+            previous={overviewQ.data?.stickiness.previous}
+            hint="DAU/MAU · >20% tốt"
+            loading={overviewQ.isLoading}
+          />
+          <KPICard
+            label="Avg Habit"
+            icon={Flame}
+            value={habitQ.data?.avg_score ?? 0}
+            hint={`${habitQ.data?.power_users ?? 0} power user`}
+            loading={habitQ.isLoading}
+          />
+          <KPICard
+            label="Active 7d"
+            icon={Activity}
+            value={snapshotQ.data?.active_count ?? 0}
+            hint={`${snapshotQ.data?.churned_count ?? 0} churned`}
+            loading={snapshotQ.isLoading}
+          />
+          <KPICard
+            label="New Signups"
+            icon={UserPlus}
+            value={overviewQ.data?.new_signups.current ?? 0}
+            current={overviewQ.data?.new_signups.current}
+            previous={overviewQ.data?.new_signups.previous}
+            hint="7d · vs tuần trước"
+            loading={overviewQ.isLoading}
+          />
+          <KPICard
+            label="NPS"
+            icon={Target}
+            value={npsQ.data?.nps_score ?? 0}
+            hint={`${npsQ.data?.total_responses ?? 0} response · 90d`}
+            loading={npsQ.isLoading}
+          />
         </div>
 
-        {/* Charts row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Charts row 1: growth + retention */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Tăng trưởng đăng ký 12 tuần</h3>
-              <CrmBarChart
-                labels={weeklyGrowth.map((w) => w.label)}
-                series={[{ label: "User mới", color: "#CD9C20", values: weeklyGrowth.map((w) => w.count) }]}
-                formatValue={(n) => `${n} user`}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Đã rút theo tháng</h3>
-              <CrmBarChart
-                labels={monthlyMoney.map((m) => m.label)}
-                series={[
-                  { label: "Đã rút", color: "#3B6C4F", values: monthlyMoney.map((m) => m.withdraw) },
-                ]}
-                formatValue={(n) => formatUsd(n)}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Row 2: method + top customers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Phương pháp giao dịch</h3>
-              <CrmMethodBreakdown entries={methodEntries} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Top 10 khách hàng theo tiền rút</h3>
-              {topCustomers.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">
-                  Chưa có khách hàng rút tiền.
-                </p>
+              <h3 className="text-sm font-semibold mb-3">WAU Loggers · 12 tuần</h3>
+              {seriesQ.isLoading || !seriesQ.data ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
               ) : (
-                <div className="space-y-2">
-                  {topCustomers.map((tc, i) => (
-                    <Link
-                      key={tc.userId}
-                      href={`/admin/khach-hang/${tc.userId}`}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <span className={cn(
-                        "text-xs font-bold w-6 text-center",
-                        i === 0 ? "text-gold" : i < 3 ? "text-foreground" : "text-muted-foreground",
-                      )}>
-                        {i + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{tc.profile!.full_name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{tc.profile!.email}</div>
-                      </div>
-                      <div className="text-sm font-semibold text-emerald-500 tabular-nums">
-                        {formatUsd(tc.amount)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={seriesQ.data.wauLoggers12w}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
+                    <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "d/M")} fontSize={10} />
+                    <YAxis fontSize={10} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Line type="monotone" dataKey="value" stroke="#CD9C20" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-5">
+              <h3 className="text-sm font-semibold mb-3">DAU / WAU / MAU · 90 ngày</h3>
+              {seriesQ.isLoading || !seriesQ.data ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={seriesQ.data.activeUsers90d}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
+                    <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "d/M")} fontSize={10} interval={Math.floor(seriesQ.data.activeUsers90d.length / 6)} />
+                    <YAxis fontSize={10} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Line type="monotone" dataKey="dau" stroke="#3B6C4F" strokeWidth={1.5} dot={false} name="DAU" />
+                    <Line type="monotone" dataKey="wau" stroke="#CD9C20" strokeWidth={1.5} dot={false} name="WAU" />
+                    <Line type="monotone" dataKey="mau" stroke="#7E5BC9" strokeWidth={1.5} dot={false} name="MAU" />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-5">
+              <h3 className="text-sm font-semibold mb-3">Active vs Churned · 60 ngày</h3>
+              {acSeriesQ.isLoading || !acSeriesQ.data ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={acSeriesQ.data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
+                    <XAxis dataKey="day" tickFormatter={(d) => format(parseISO(d), "d/M")} fontSize={10} interval={Math.floor(acSeriesQ.data.length / 5)} />
+                    <YAxis fontSize={10} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Area type="monotone" dataKey="active_count" stackId="1" stroke="#3B6C4F" fill="#3B6C4F" fillOpacity={0.6} name="Active" />
+                    <Area type="monotone" dataKey="churned_count" stackId="1" stroke="#B8512E" fill="#B8512E" fillOpacity={0.5} name="Churned" />
+                  </AreaChart>
+                </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Daily activity 30 days */}
-        <Card>
-          <CardContent className="pt-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Hoạt động 30 ngày qua</h3>
-            <CrmBarChart
-              labels={dailyActivity.map((d) => d.label)}
-              series={[
-                { label: "Page views", color: "#3081A4", values: dailyActivity.map((d) => d.pageViews) },
-                { label: "Logins", color: "#CD9C20", values: dailyActivity.map((d) => d.logins) },
-              ]}
-              formatValue={(n) => `${n} event`}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Recent activity */}
-        <Card>
-          <CardContent className="pt-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Hoạt động gần nhất</h3>
-            {recentActive.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                Chưa có dữ liệu hoạt động.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {recentActive.map(({ access: a, profile: p }) => {
-                  const days = daysSince(a.last_seen_at);
-                  return (
-                    <Link
-                      key={p.id}
-                      href={`/admin/khach-hang/${p.id}`}
-                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-border hover:border-gold/30 hover:bg-gold/5 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{p.full_name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{p.email}</div>
-                      </div>
-                      <div className="text-xs text-right shrink-0">
-                        <div className="font-semibold text-foreground">
-                          {days === 0 ? "Hôm nay" : days === 1 ? "Hôm qua" : `${days} ngày`}
-                        </div>
-                        <div className="text-muted-foreground">
-                          {a.last_seen_at ? formatDate(a.last_seen_at) : "—"}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+        {/* Cohort + Tier + Style */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-1">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Tier hiện tại</h3>
+                <Crown className="h-4 w-4 text-gold" />
               </div>
+              {tierQ.isLoading || tierPie.length === 0 ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={tierPie} dataKey="value" nameKey="label" innerRadius={36} outerRadius={66}>
+                      {tierPie.map((d) => <Cell key={d.tier} fill={TIER_META[d.tier]?.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 9 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-1">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Trading style</h3>
+                <Filter className="h-4 w-4 text-gold" />
+              </div>
+              {styleQ.isLoading ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <div className="space-y-2">
+                  {(styleQ.data ?? []).slice(0, 5).map((s) => {
+                    const meta = STYLE_META[s.segment_value];
+                    return (
+                      <div key={s.segment_value}>
+                        <div className="flex items-center justify-between text-xs mb-0.5">
+                          <span className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-sm" style={{ background: meta?.color ?? "#666" }} />
+                            <span className="text-foreground font-medium">{meta?.label ?? s.segment_value}</span>
+                          </span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {s.user_count} · {s.retention_28d_pct}% retain
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${s.pct_of_total}%`, background: meta?.color ?? "#666" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-1">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">New signups · 30 ngày</h3>
+                <UserPlus className="h-4 w-4 text-gold" />
+              </div>
+              {seriesQ.isLoading || !seriesQ.data ? (
+                <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={seriesQ.data.signups30d}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} />
+                    <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "d/M")} fontSize={10} interval={Math.floor(seriesQ.data.signups30d.length / 4)} />
+                    <YAxis fontSize={10} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="value" fill="#CD9C20" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cohort heatmap */}
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Repeat className="h-4 w-4 text-gold" /> Cohort Retention · 8 tuần
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Flatten ≥30% sau M2 = PMF signal
+                </p>
+              </div>
+            </div>
+            {cohortQ.isLoading || !cohortQ.data ? (
+              <div className="h-40 rounded-lg bg-muted/30 animate-pulse" />
+            ) : (
+              <CohortHeatmap data={cohortQ.data} />
             )}
           </CardContent>
         </Card>
+
+        {/* Drill-down links — vào trang chi tiết */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <DrillCard href="/admin/crm/engagement" icon={Flame} title="Engagement & Habit" hint="Habit score, tier movement, heatmap" />
+          <DrillCard href="/admin/crm/retention" icon={Repeat} title="Retention & Churn" hint="Cohort full, churn rate, at-risk list" />
+          <DrillCard href="/admin/crm/segments" icon={Filter} title="Segmentation" hint="3 chiều phân khúc, top users" />
+          <DrillCard href="/admin/crm/voc" icon={Target} title="Voice of Customer" hint="NPS detail, feedback list" />
+        </div>
       </motion.div>
     </PageTransition>
   );
 }
 
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: typeof UsersIcon;
-  label: string;
-  value: string;
-  hint: string;
-  tone: string;
-}) {
+function DrillCard({
+  href, icon: Icon, title, hint,
+}: { href: string; icon: typeof Flame; title: string; hint: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
+    <Link
+      href={href}
+      className="rounded-xl border border-border bg-card p-3 hover:border-gold/40 hover:bg-gold/5 transition-colors group"
+    >
+      <div className="flex items-start gap-2.5">
+        <Icon className="h-4 w-4 text-gold shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-foreground group-hover:text-gold transition-colors flex items-center gap-1">
+            {title}
+            <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{hint}</div>
+        </div>
       </div>
-      <div className={cn("mt-1 text-lg font-bold", tone)}>{value}</div>
-      <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">{hint}</div>
-    </div>
+    </Link>
   );
 }
