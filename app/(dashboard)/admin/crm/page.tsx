@@ -2,10 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import {
   ChartLine, Star, Users, Activity, UserPlus, Target, Crown, Flame, Repeat, Filter,
-  ChevronRight,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -308,36 +306,7 @@ export default function AdminUnifiedDashboard() {
           </CardContent>
         </Card>
 
-        {/* Drill-down links — vào trang chi tiết */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <DrillCard href="/admin/crm/engagement" icon={Flame} title="Engagement & Habit" hint="Habit score, tier movement, heatmap" />
-          <DrillCard href="/admin/crm/retention" icon={Repeat} title="Retention & Churn" hint="Cohort full, churn rate, at-risk list" />
-          <DrillCard href="/admin/crm/segments" icon={Filter} title="Segmentation" hint="3 chiều phân khúc, top users" />
-          <DrillCard href="/admin/crm/voc" icon={Target} title="Voice of Customer" hint="NPS detail, feedback list" />
-        </div>
       </motion.div>
     </PageTransition>
-  );
-}
-
-function DrillCard({
-  href, icon: Icon, title, hint,
-}: { href: string; icon: typeof Flame; title: string; hint: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-xl border border-border bg-card p-3 hover:border-gold/40 hover:bg-gold/5 transition-colors group"
-    >
-      <div className="flex items-start gap-2.5">
-        <Icon className="h-4 w-4 text-gold shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-foreground group-hover:text-gold transition-colors flex items-center gap-1">
-            {title}
-            <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{hint}</div>
-        </div>
-      </div>
-    </Link>
   );
 }
