@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { addMachine } from "@/lib/co-may/mock-data";
-import { linkMt5ToMachine } from "@/lib/co-may/mt5-actions";
 import type { SignalSource } from "@/lib/co-may/types";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -40,11 +39,6 @@ interface FormState {
   targetWithdrawCount: string;
   targetProfit: string;
   anchors: number[];
-  // Optional MT5 monitoring (read-only investor password)
-  mt5Enabled: boolean;
-  mt5Login: string;
-  mt5Password: string;
-  mt5Server: string;
 }
 
 const INITIAL: FormState = {
@@ -57,10 +51,6 @@ const INITIAL: FormState = {
   targetWithdrawCount: "10",
   targetProfit: "300",
   anchors: [],
-  mt5Enabled: false,
-  mt5Login: "",
-  mt5Password: "",
-  mt5Server: "",
 };
 
 /**
@@ -95,7 +85,6 @@ export function CreateMachineDialog({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const capitalNum = Number(form.capital) || 0;
 
@@ -143,11 +132,8 @@ export function CreateMachineDialog({
     setForm((f) => ({ ...f, anchors: generateAnchors(capitalNum) }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitting) return;
-    setError(null);
-
     if (!form.name.trim()) return setError("Tên cỗ máy không được để trống");
     if (!Number.isFinite(capitalNum) || capitalNum <= 0)
       return setError("Vốn phải > 0");
@@ -156,20 +142,7 @@ export function CreateMachineDialog({
         `Vốn (${usd.format(capitalNum)}) vượt vốn dự trữ khả dụng (${usd.format(reservePool)})`,
       );
 
-    // Validate MT5 fields nếu user bật toggle
-    if (form.mt5Enabled) {
-      if (!form.mt5Login.trim() || !form.mt5Password || !form.mt5Server.trim()) {
-        return setError("Bật MT5 thì phải điền đủ Login + Password + Server (hoặc tắt toggle).");
-      }
-      if (!/^\d+$/.test(form.mt5Login.trim())) {
-        return setError("MT5 Login phải là số nguyên (vd: 153152412).");
-      }
-    }
-
-    setSubmitting(true);
-
-    // Step 1: tạo cỗ máy như cũ (sync local + fire-and-forget cloud push)
-    const machine = addMachine(userId, {
+    addMachine(userId, {
       name: form.name.trim(),
       capital: capitalNum,
       current_anchor: capitalNum, // Anchor khởi đầu = vốn ban đầu
@@ -181,27 +154,6 @@ export function CreateMachineDialog({
       target_profit: Number(form.targetProfit) || undefined,
       anchor_milestones: form.anchors.length > 0 ? form.anchors : undefined,
     });
-
-    // Step 2: link MT5 nếu user bật. Server action retry chờ cloudPush.machine.
-    if (form.mt5Enabled) {
-      const res = await linkMt5ToMachine({
-        userId,
-        machineId: machine.id,
-        login: form.mt5Login.trim(),
-        password: form.mt5Password,
-        server: form.mt5Server.trim(),
-      });
-      if (!res.success) {
-        setError(
-          `Cỗ máy "${machine.name}" đã tạo nhưng link MT5 thất bại: ${res.error}. ` +
-          `Xoá cỗ máy này (Quản lý) rồi tạo lại, hoặc liên hệ admin.`,
-        );
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    setSubmitting(false);
     reset();
     setOpen(false);
     onCreated();
@@ -415,67 +367,6 @@ export function CreateMachineDialog({
             </p>
           </div>
 
-          {/* MT5 monitoring (optional) */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Giám sát MT5 (tuỳ chọn)
-            </h3>
-            <label className="flex items-start gap-2 cursor-pointer rounded-xl border border-border bg-card p-3">
-              <input
-                type="checkbox"
-                checked={form.mt5Enabled}
-                onChange={(e) => update("mt5Enabled", e.target.checked)}
-                className="mt-0.5 h-4 w-4 cursor-pointer"
-              />
-              <div className="flex-1 space-y-0.5">
-                <div className="text-sm font-medium">
-                  Cỗ máy này có MT5 — bật giám sát kỷ luật tự động
-                </div>
-                <div className="text-xs italic text-muted-foreground/80">
-                  Hệ thống đọc data MT5 qua INVESTOR password (read-only),
-                  so sánh với log của bạn để chấm điểm kỷ luật mỗi ngày.
-                </div>
-              </div>
-            </label>
-
-            {form.mt5Enabled && (
-              <div className="space-y-3 rounded-xl border-2 border-dashed border-border bg-card/50 p-3">
-                <Field label="MT5 Login" hint="Số tài khoản MT5 (số nguyên)">
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={form.mt5Login}
-                    onChange={(e) => update("mt5Login", e.target.value)}
-                    placeholder="VD: 153152412"
-                    className="h-11 text-base"
-                  />
-                </Field>
-                <Field
-                  label="MT5 Investor Password"
-                  hint="Password CHỈ ĐỌC — KHÔNG phải master password. Lấy trong MT5 → File → Login to Trade Account → Save investor password."
-                >
-                  <Input
-                    type="password"
-                    value={form.mt5Password}
-                    onChange={(e) => update("mt5Password", e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    className="h-11 text-base"
-                  />
-                </Field>
-                <Field label="MT5 Server" hint="Tên server broker chính xác">
-                  <Input
-                    type="text"
-                    value={form.mt5Server}
-                    onChange={(e) => update("mt5Server", e.target.value)}
-                    placeholder="VD: HFMarketsGlobal-Live11"
-                    className="h-11 text-base"
-                  />
-                </Field>
-              </div>
-            )}
-          </div>
-
           {error && (
             <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
@@ -483,20 +374,11 @@ export function CreateMachineDialog({
           )}
 
           <DialogFooter className="-mx-4 -mb-4 mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={submitting}
-            >
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Huỷ
             </Button>
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="bg-foreground text-background hover:bg-foreground/90 px-8 disabled:opacity-60"
-            >
-              {submitting ? "Đang khởi tạo..." : "Khởi động"}
+            <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 px-8">
+              Khởi động
             </Button>
           </DialogFooter>
         </form>
