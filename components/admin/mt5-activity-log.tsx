@@ -52,7 +52,7 @@ interface DailyBucket {
 
 interface Props {
   mt5AccountId: string;
-  machineId: string;
+  machineId?: string;                    // optional: nếu absent thì không fetch manual log
   daysBack?: number;                     // default 30
 }
 
@@ -84,13 +84,12 @@ export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props
       setLoading(true);
       const since = new Date(Date.now() - daysBack * DAY_MS).toISOString();
 
-      // 3 query song song
-      const [tradesRes, txsRes, manualRes] = await Promise.all([
+      // 2 hoặc 3 query song song (manual log chỉ fetch khi có machineId)
+      const promises: Array<Promise<unknown>> = [
         supabase
           .from("mt5_trades")
           .select("ticket, symbol, type, volume, price_open, price_close, profit, swap, commission, time_open, time_close, is_closed")
           .eq("mt5_account_id", mt5AccountId)
-          // closed trades dùng time_close, open positions dùng time_open
           .or(`time_close.gte.${since},time_open.gte.${since}`)
           .order("time_close", { ascending: false, nullsFirst: false }),
         supabase
@@ -99,13 +98,21 @@ export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props
           .eq("mt5_account_id", mt5AccountId)
           .gte("time", since)
           .order("time", { ascending: false }),
-        supabase
-          .from("comay_transactions")
-          .select("id, type, amount, note, created_at")
-          .eq("machine_id", machineId)
-          .gte("created_at", since)
-          .order("created_at", { ascending: false }),
-      ]);
+      ];
+      if (machineId) {
+        promises.push(
+          supabase
+            .from("comay_transactions")
+            .select("id, type, amount, note, created_at")
+            .eq("machine_id", machineId)
+            .gte("created_at", since)
+            .order("created_at", { ascending: false }),
+        );
+      }
+      const results = await Promise.all(promises);
+      const tradesRes = results[0] as { data: Mt5TradeRow[] | null };
+      const txsRes = results[1] as { data: Mt5TransactionRow[] | null };
+      const manualRes = (results[2] ?? { data: [] }) as { data: ManualTxRow[] | null };
 
       if (!mounted) return;
 

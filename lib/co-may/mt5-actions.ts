@@ -31,6 +31,13 @@ export interface Mt5LinkResult {
   error?: string;
 }
 
+export interface StandaloneMt5Input {
+  login: string;
+  password: string;
+  server: string;
+  nickname?: string;
+}
+
 /**
  * Link 1 MT5 account vào 1 cỗ máy (admin-only flow).
  *
@@ -42,6 +49,72 @@ export interface Mt5LinkResult {
  *
  * Error messages trả về chi tiết để admin debug được ngay tại UI.
  */
+/**
+ * Tạo MT5 account standalone — không link với user/machine nào.
+ * Dùng cho admin test sync hoặc khi muốn xem MT5 data raw trước.
+ *
+ * Yêu cầu DB: chạy supabase-mt5-standalone.sql để bỏ FK + NOT NULL trên user_id.
+ */
+export async function createStandaloneMt5Account(
+  input: StandaloneMt5Input,
+): Promise<Mt5LinkResult> {
+  const sb = serviceClient();
+
+  // Encrypt password
+  let encryptedPassword: string;
+  try {
+    encryptedPassword = await encryptMt5Password(input.password);
+  } catch (e) {
+    return { success: false, error: `Lỗi mã hoá password: ${(e as Error).message}` };
+  }
+
+  const accountRes = await sb
+    .from("mt5_accounts")
+    .insert({
+      login: input.login.trim(),
+      server: input.server.trim(),
+      encrypted_password: encryptedPassword,
+      broker_name: input.server.trim().split("-")[0] || null,
+      nickname: input.nickname?.trim() || null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+
+  if (accountRes.error) {
+    const code = accountRes.error.code;
+    if (code === "23505") {
+      return {
+        success: false,
+        error: `Account MT5 ${input.login}@${input.server} đã tồn tại (UNIQUE constraint).`,
+      };
+    }
+    if (code === "23502") {
+      return {
+        success: false,
+        error: `Cột NOT NULL bị thiếu — có thể bạn chưa chạy supabase-mt5-standalone.sql để bỏ NOT NULL trên user_id. Raw: ${accountRes.error.message}`,
+      };
+    }
+    return {
+      success: false,
+      error: `Insert mt5_accounts fail [code=${code}]: ${accountRes.error.message}${accountRes.error.hint ? ` (hint: ${accountRes.error.hint})` : ""}`,
+    };
+  }
+
+  return { success: true, mt5AccountId: accountRes.data.id as string };
+}
+
+/**
+ * Xoá MT5 account và toàn bộ data liên quan (trades, transactions, links).
+ * Foreign key CASCADE đã set sẵn ở schema.
+ */
+export async function deleteMt5Account(mt5AccountId: string): Promise<{ success: boolean; error?: string }> {
+  const sb = serviceClient();
+  const res = await sb.from("mt5_accounts").delete().eq("id", mt5AccountId);
+  if (res.error) return { success: false, error: res.error.message };
+  return { success: true };
+}
+
 export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResult> {
   const sb = serviceClient();
 
