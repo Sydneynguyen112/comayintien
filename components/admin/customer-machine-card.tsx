@@ -1,8 +1,9 @@
 "use client";
 
-import { Anchor, ArrowDown, ArrowUp, Coins, TrendingUp, Wallet } from "lucide-react";
+import { Activity, Anchor, ArrowDown, ArrowUp, CheckCircle2, Clock, Coins, TrendingUp, Wallet, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Mt5LinkDialog } from "./mt5-link-dialog";
 
 export interface MachineLite {
   id: string;
@@ -24,9 +25,21 @@ export interface MachineTx {
   created_at: string;
 }
 
+export interface Mt5Info {
+  accountId: string;
+  login: string;
+  server: string;
+  status: string;                // pending | active | error | disabled
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
+
 interface Props {
   machine: MachineLite;
   transactions: MachineTx[];
+  userId: string;                // cần cho dialog gán link
+  mt5?: Mt5Info | null;          // null/undefined = chưa link MT5
+  onMt5Changed?: () => void;     // callback refresh page sau khi link
 }
 
 const statusStyles: Record<string, string> = {
@@ -58,7 +71,7 @@ function daysSince(iso: string | null): number | null {
  * Card hiển thị toàn bộ chỉ số 1 cỗ máy: vốn, anchor, PnL, withdraw stats,
  * idle days, lịch sử nâng/hạ neo.
  */
-export function CustomerMachineCard({ machine, transactions }: Props) {
+export function CustomerMachineCard({ machine, transactions, userId, mt5, onMt5Changed }: Props) {
   const machineTx = transactions
     .filter((t) => t.machine_id === machine.id)
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -154,6 +167,23 @@ export function CustomerMachineCard({ machine, transactions }: Props) {
         </div>
       </div>
 
+      {/* MT5 monitoring */}
+      <div className="border-t border-border pt-3">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+          <Activity className="h-3 w-3" /> MT5 Giám sát
+        </div>
+        {mt5 ? (
+          <Mt5StatusBlock mt5={mt5} />
+        ) : (
+          <Mt5LinkDialog
+            userId={userId}
+            machineId={machine.id}
+            machineName={machine.name}
+            onLinked={onMt5Changed}
+          />
+        )}
+      </div>
+
       {/* Anchor history */}
       {anchorChanges.length > 0 && (
         <div className="border-t border-border pt-3">
@@ -180,6 +210,44 @@ export function CustomerMachineCard({ machine, transactions }: Props) {
               );
             })}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const mt5StatusStyles: Record<string, { icon: typeof CheckCircle2; tone: string; label: string }> = {
+  active:   { icon: CheckCircle2, tone: "text-emerald-500",      label: "Đang sync" },
+  pending:  { icon: Clock,        tone: "text-amber-500",        label: "Chờ sync lần đầu" },
+  error:    { icon: XCircle,      tone: "text-red-500",          label: "Lỗi" },
+  disabled: { icon: XCircle,      tone: "text-muted-foreground", label: "Tạm tắt" },
+};
+
+function Mt5StatusBlock({ mt5 }: { mt5: Mt5Info }) {
+  const s = mt5StatusStyles[mt5.status] ?? mt5StatusStyles.pending;
+  const Icon = s.icon;
+  const lastSynced = mt5.lastSyncedAt ? daysSince(mt5.lastSyncedAt) : null;
+
+  return (
+    <div className="space-y-1.5 text-xs">
+      <div className="flex items-center gap-1.5">
+        <Icon className={cn("h-3.5 w-3.5", s.tone)} />
+        <span className={cn("font-semibold", s.tone)}>{s.label}</span>
+      </div>
+      <div className="text-muted-foreground tabular-nums">
+        Login <span className="text-foreground font-medium">{mt5.login}</span>
+        {" · "}
+        <span className="text-foreground">{mt5.server}</span>
+      </div>
+      <div className="text-muted-foreground">
+        Sync cuối:{" "}
+        <span className="text-foreground tabular-nums">
+          {lastSynced === null ? "—" : lastSynced === 0 ? "Hôm nay" : `${lastSynced} ngày trước`}
+        </span>
+      </div>
+      {mt5.lastError && (
+        <div className="rounded border border-red-500/30 bg-red-500/5 px-2 py-1 text-red-600 dark:text-red-400">
+          {mt5.lastError.length > 100 ? mt5.lastError.slice(0, 100) + "…" : mt5.lastError}
         </div>
       )}
     </div>

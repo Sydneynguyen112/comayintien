@@ -26,7 +26,7 @@ import { UserRowActions, type UserStatus } from "@/components/admin/user-row-act
 import { MentorAssignSelect } from "@/components/admin/mentor-assign-select";
 import { ActivityTimeline } from "@/components/admin/activity-timeline";
 import { RoleChangeSelect } from "@/components/admin/role-change-select";
-import { CustomerMachineCard } from "@/components/admin/customer-machine-card";
+import { CustomerMachineCard, type Mt5Info } from "@/components/admin/customer-machine-card";
 
 interface AccessRow {
   user_id: string;
@@ -56,6 +56,20 @@ interface TxRow {
   created_at: string;
 }
 
+interface Mt5LinkRow {
+  machine_id: string;
+  mt5_account_id: string;
+}
+
+interface Mt5AccountRow {
+  id: string;
+  login: string;
+  server: string;
+  status: string;
+  last_synced_at: string | null;
+  last_error: string | null;
+}
+
 function formatUsd(n: number) {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
@@ -81,6 +95,7 @@ export default function AdminUserDetailPage() {
   const [machines, setMachines] = useState<MachineRow[]>([]);
   const [transactions, setTransactions] = useState<TxRow[]>([]);
   const [setupCapital, setSetupCapital] = useState(0);
+  const [mt5ByMachine, setMt5ByMachine] = useState<Record<string, Mt5Info>>({});
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
@@ -110,9 +125,51 @@ export default function AdminUserDetailPage() {
     ]);
     setProfile(p as Profile);
     setAccess((a ?? null) as AccessRow | null);
-    setMachines((m ?? []) as MachineRow[]);
+    const machineList = (m ?? []) as MachineRow[];
+    setMachines(machineList);
     setTransactions((tx ?? []) as TxRow[]);
     setSetupCapital((setup?.total_capital as number | undefined) ?? 0);
+
+    // Fetch MT5 links + accounts cho các máy của user. Anon key có quyền SELECT
+    // (RLS policy mt5_accounts USING auth.uid() = user_id). Admin xem chính user của họ thì OK.
+    if (machineList.length > 0) {
+      const machineIds = machineList.map((mm) => mm.id);
+      const { data: links } = await supabase
+        .from("mt5_machine_links")
+        .select("machine_id, mt5_account_id")
+        .in("machine_id", machineIds);
+      const linkRows = (links ?? []) as Mt5LinkRow[];
+
+      if (linkRows.length > 0) {
+        const accountIds = [...new Set(linkRows.map((l) => l.mt5_account_id))];
+        const { data: accts } = await supabase
+          .from("mt5_accounts")
+          .select("id, login, server, status, last_synced_at, last_error")
+          .in("id", accountIds);
+        const acctMap = new Map<string, Mt5AccountRow>();
+        for (const acct of (accts ?? []) as Mt5AccountRow[]) acctMap.set(acct.id, acct);
+
+        const byMachine: Record<string, Mt5Info> = {};
+        for (const link of linkRows) {
+          const acct = acctMap.get(link.mt5_account_id);
+          if (!acct) continue;
+          byMachine[link.machine_id] = {
+            accountId: acct.id,
+            login: acct.login,
+            server: acct.server,
+            status: acct.status,
+            lastSyncedAt: acct.last_synced_at,
+            lastError: acct.last_error,
+          };
+        }
+        setMt5ByMachine(byMachine);
+      } else {
+        setMt5ByMachine({});
+      }
+    } else {
+      setMt5ByMachine({});
+    }
+
     setLoading(false);
   }
 
@@ -283,6 +340,9 @@ export default function AdminUserDetailPage() {
                       key={m.id}
                       machine={m}
                       transactions={transactions}
+                      userId={profile.id}
+                      mt5={mt5ByMachine[m.id] ?? null}
+                      onMt5Changed={loadData}
                     />
                   ))}
                 </div>
