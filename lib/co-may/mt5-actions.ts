@@ -77,10 +77,12 @@ export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResu
   }
 
   // Step 3: insert mt5_accounts
+  // Dùng machine.user_id (đã verify exists trong comay_machines) thay vì input.userId —
+  // tránh edge case khi FK của mt5_accounts.user_id ref khác table (auth.users vs profiles).
   const accountRes = await sb
     .from("mt5_accounts")
     .insert({
-      user_id: input.userId,
+      user_id: machineRes.data.user_id,
       login: input.login.trim(),
       server: input.server.trim(),
       encrypted_password: encryptedPassword,
