@@ -13,6 +13,7 @@ import type { CycleReport, Machine, MachineTransaction } from "@/lib/co-may/type
 import { MachineCard } from "./machine-card";
 import { ClosedMachineCard } from "./closed-machine-card";
 import { CreateMachineDialog } from "./create-machine-dialog";
+import { MachineMt5Footer } from "./machine-mt5-footer";
 
 type RoleSlug = "client" | "mentor" | "admin";
 
@@ -119,13 +120,20 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {active.map(({ ownerId, m }) => (
-                      <MachineCard
-                        key={m.id}
-                        machine={m}
-                        tx={tx.filter((t) => t.machine_id === m.id)}
-                        detailHref={`/${role}/co-may/quan-ly/${m.id}?owner=${ownerId}`}
-                        role={role}
-                      />
+                      <div key={m.id} className="space-y-2">
+                        <MachineCard
+                          machine={m}
+                          tx={tx.filter((t) => t.machine_id === m.id)}
+                          detailHref={`/${role}/co-may/quan-ly/${m.id}?owner=${ownerId}`}
+                          role={role}
+                        />
+                        <MachineMt5Footer
+                          machineId={m.id}
+                          machineName={m.name}
+                          userId={ownerId}
+                          canLink={role === "client" && ownerId === user.id}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
