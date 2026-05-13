@@ -53,8 +53,16 @@ interface DailyBucket {
 interface Props {
   mt5AccountId: string;
   machineId?: string;                    // optional: nếu absent thì không fetch manual log
-  daysBack?: number;                     // default 30
+  daysBack?: number;                     // initial value, user có thể đổi qua dropdown. default 90.
 }
+
+const DAYS_BACK_OPTIONS = [
+  { value: 7, label: "7 ngày" },
+  { value: 30, label: "30 ngày" },
+  { value: 90, label: "90 ngày" },
+  { value: 365, label: "1 năm" },
+  { value: 3650, label: "Tất cả (10 năm)" },
+];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -72,7 +80,8 @@ function formatTime(iso: string | null): string {
   return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props) {
+export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack: initialDaysBack = 90 }: Props) {
+  const [daysBack, setDaysBack] = useState(initialDaysBack);
   const [loading, setLoading] = useState(true);
   const [buckets, setBuckets] = useState<DailyBucket[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -174,28 +183,49 @@ export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props
     );
   }
 
+  const Header = (
+    <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-center gap-2">
+        <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+          Khoảng thời gian:
+        </label>
+        <select
+          value={daysBack}
+          onChange={(e) => setDaysBack(Number(e.target.value))}
+          className="h-7 rounded border border-input bg-background px-2 text-[11px] focus-visible:ring-1 focus-visible:ring-ring outline-none"
+        >
+          {DAYS_BACK_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <span className="text-[10px] text-muted-foreground">
+          {buckets.length} ngày có hoạt động
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => setReloadKey((k) => k + 1)}
+        className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+      >
+        <RefreshCcw className="h-3 w-3" /> Reload
+      </button>
+    </div>
+  );
+
   if (buckets.length === 0) {
     return (
-      <div className="text-xs text-muted-foreground py-3 text-center italic">
-        Chưa có hoạt động MT5 nào trong {daysBack} ngày. Đợi sync chạy lần đầu (mỗi 5 phút).
+      <div className="space-y-2">
+        {Header}
+        <div className="text-xs text-muted-foreground py-3 text-center italic">
+          Chưa có hoạt động MT5 nào trong {daysBack} ngày. Thử mở rộng khoảng thời gian.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-          {buckets.length} ngày có hoạt động · {daysBack} ngày qua
-        </div>
-        <button
-          type="button"
-          onClick={() => setReloadKey((k) => k + 1)}
-          className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          <RefreshCcw className="h-3 w-3" /> Reload
-        </button>
-      </div>
+    <div className="space-y-2">
+      {Header}
 
       <div className="space-y-1">
         {buckets.map((b) => {
