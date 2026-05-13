@@ -207,7 +207,7 @@ export default function AdminMt5Page() {
                   </button>
                   {isOpen && (
                     <div className="px-5 pb-5 pt-1 border-t border-border bg-muted/20">
-                      <Mt5ActivityLog mt5AccountId={acc.id} daysBack={30} />
+                      <Mt5ActivityLog mt5AccountId={acc.id} daysBack={365} />
                       <div className="mt-3 text-[10px] text-muted-foreground/80">
                         ID: <code className="font-mono">{acc.id}</code> · Created {formatDate(acc.created_at)}
                       </div>
