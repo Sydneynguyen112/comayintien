@@ -84,8 +84,8 @@ export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props
       setLoading(true);
       const since = new Date(Date.now() - daysBack * DAY_MS).toISOString();
 
-      // 2 hoặc 3 query song song (manual log chỉ fetch khi có machineId)
-      const promises: Array<Promise<unknown>> = [
+      // 2 query MT5 song song (cùng shape, Promise.all OK)
+      const [tradesRes, txsRes] = await Promise.all([
         supabase
           .from("mt5_trades")
           .select("ticket, symbol, type, volume, price_open, price_close, profit, swap, commission, time_open, time_close, is_closed")
@@ -98,27 +98,25 @@ export function Mt5ActivityLog({ mt5AccountId, machineId, daysBack = 30 }: Props
           .eq("mt5_account_id", mt5AccountId)
           .gte("time", since)
           .order("time", { ascending: false }),
-      ];
+      ]);
+
+      // Manual log (Co Máy) chỉ fetch khi caller pass machineId (vd customer detail page),
+      // standalone admin/mt5 page không cần
+      let manuals: ManualTxRow[] = [];
       if (machineId) {
-        promises.push(
-          supabase
-            .from("comay_transactions")
-            .select("id, type, amount, note, created_at")
-            .eq("machine_id", machineId)
-            .gte("created_at", since)
-            .order("created_at", { ascending: false }),
-        );
+        const manualRes = await supabase
+          .from("comay_transactions")
+          .select("id, type, amount, note, created_at")
+          .eq("machine_id", machineId)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false });
+        manuals = (manualRes.data ?? []) as ManualTxRow[];
       }
-      const results = await Promise.all(promises);
-      const tradesRes = results[0] as { data: Mt5TradeRow[] | null };
-      const txsRes = results[1] as { data: Mt5TransactionRow[] | null };
-      const manualRes = (results[2] ?? { data: [] }) as { data: ManualTxRow[] | null };
 
       if (!mounted) return;
 
       const trades = (tradesRes.data ?? []) as Mt5TradeRow[];
       const txs = (txsRes.data ?? []) as Mt5TransactionRow[];
-      const manuals = (manualRes.data ?? []) as ManualTxRow[];
 
       // Bucket theo ngày
       const map = new Map<string, DailyBucket>();
