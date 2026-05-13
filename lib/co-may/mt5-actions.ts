@@ -32,39 +32,39 @@ export interface Mt5LinkResult {
 }
 
 /**
- * Link 1 MT5 account vào 1 cỗ máy.
+ * Link 1 MT5 account vào 1 cỗ máy (admin-only flow).
  *
  * Flow:
- *   1. Chờ comay_machines row tồn tại (race với cloudPush fire-and-forget).
+ *   1. Verify comay_machines row tồn tại + thuộc user_id (1 query, không retry).
  *   2. Encrypt password bằng AES-256-GCM (key từ ENCRYPTION_KEY env).
  *   3. INSERT mt5_accounts.
  *   4. INSERT mt5_machine_links (rollback mt5_accounts nếu fail).
  *
- * KHÔNG tạo comay_machines row — caller phải tạo trước qua addMachine() / cloudPush.
+ * Error messages trả về chi tiết để admin debug được ngay tại UI.
  */
 export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResult> {
   const sb = serviceClient();
 
-  // Step 1: chờ machine row được cloudPush.machine() đẩy lên (fire-and-forget có thể chậm)
-  let machineFound = false;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const res = await sb
-      .from("comay_machines")
-      .select("id")
-      .eq("id", input.machineId)
-      .eq("user_id", input.userId)
-      .maybeSingle();
-    if (res.data) {
-      machineFound = true;
-      break;
-    }
-    // 6 lần × 400ms = chờ tối đa ~2.4s
-    await new Promise((r) => setTimeout(r, 400));
+  // Step 1: verify machine — không filter user_id để debug được lý do sai
+  const machineRes = await sb
+    .from("comay_machines")
+    .select("id, user_id, name")
+    .eq("id", input.machineId)
+    .maybeSingle();
+
+  if (machineRes.error) {
+    return { success: false, error: `Query comay_machines lỗi: ${machineRes.error.message}` };
   }
-  if (!machineFound) {
+  if (!machineRes.data) {
     return {
       success: false,
-      error: "Cỗ máy chưa sync lên Supabase sau 2.4s. Refresh trang rồi thử link MT5 lại.",
+      error: `Không tìm thấy cỗ máy có id="${input.machineId}" trong DB. Có thể máy chưa sync lên Supabase (kiểm tra Table Editor → comay_machines).`,
+    };
+  }
+  if (machineRes.data.user_id !== input.userId) {
+    return {
+      success: false,
+      error: `Cỗ máy "${machineRes.data.name}" thuộc user ${machineRes.data.user_id} nhưng UI đang pass user ${input.userId}. Báo dev kiểm tra.`,
     };
   }
 
@@ -91,26 +91,45 @@ export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResu
     .single();
 
   if (accountRes.error) {
-    // UNIQUE (login, server) violation → user đã link cùng account trước đó
-    if (accountRes.error.code === "23505") {
+    // 23505 = UNIQUE violation. 23503 = FK violation. 22P02 = invalid input syntax (vd UUID vs TEXT).
+    const code = accountRes.error.code;
+    if (code === "23505") {
       return {
         success: false,
-        error: `Account MT5 ${input.login}@${input.server} đã được link trước đó.`,
+        error: `Account MT5 ${input.login}@${input.server} đã được link trước đó (UNIQUE constraint).`,
       };
     }
-    return { success: false, error: `Insert mt5_accounts: ${accountRes.error.message}` };
+    return {
+      success: false,
+      error: `Insert mt5_accounts fail [code=${code}]: ${accountRes.error.message}${accountRes.error.hint ? ` (hint: ${accountRes.error.hint})` : ""}`,
+    };
   }
   const mt5AccountId = accountRes.data.id as string;
 
-  // Step 4: insert link, rollback mt5_accounts nếu fail
+  // Step 4: insert link
   const linkRes = await sb.from("mt5_machine_links").insert({
     mt5_account_id: mt5AccountId,
     machine_id: input.machineId,
     is_primary: true,
   });
   if (linkRes.error) {
+    // Rollback mt5_accounts để không có row mồ côi
     await sb.from("mt5_accounts").delete().eq("id", mt5AccountId);
-    return { success: false, error: `Insert mt5_machine_links: ${linkRes.error.message}` };
+    const code = linkRes.error.code;
+    // 22P02: machine_id column type mismatch (UUID vs TEXT — bug schema cũ)
+    if (code === "22P02") {
+      return {
+        success: false,
+        error:
+          `Insert mt5_machine_links fail: cột machine_id đang là UUID, cần đổi sang TEXT. ` +
+          `Chạy supabase-mt5-fix-machine-id-type.sql trong Supabase SQL Editor. ` +
+          `(raw: ${linkRes.error.message})`,
+      };
+    }
+    return {
+      success: false,
+      error: `Insert mt5_machine_links fail [code=${code}]: ${linkRes.error.message}${linkRes.error.hint ? ` (hint: ${linkRes.error.hint})` : ""}`,
+    };
   }
 
   return { success: true, mt5AccountId };
