@@ -9,11 +9,14 @@
 const NONCE_SIZE = 12;
 const KEY_SIZE = 32;
 
-function hexToBytes(hex: string): Uint8Array {
+// Return type ràng buộc <ArrayBuffer> (không phải ArrayBufferLike) để pass strict
+// BufferSource check của TS 5.7+ — Web Crypto APIs yêu cầu ArrayBufferView<ArrayBuffer>.
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   if (hex.length !== KEY_SIZE * 2) {
     throw new Error(`ENCRYPTION_KEY phải là ${KEY_SIZE * 2} hex chars, nhận được ${hex.length}`);
   }
-  const out = new Uint8Array(KEY_SIZE);
+  // Explicit `new ArrayBuffer(...)` đảm bảo TS infer Uint8Array<ArrayBuffer>, không phải <ArrayBufferLike>.
+  const out = new Uint8Array(new ArrayBuffer(KEY_SIZE));
   for (let i = 0; i < KEY_SIZE; i++) {
     const byte = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
     if (Number.isNaN(byte)) throw new Error(`ENCRYPTION_KEY chứa ký tự không phải hex`);
@@ -41,15 +44,16 @@ async function getCryptoKey(): Promise<CryptoKey> {
  */
 export async function encryptMt5Password(plaintext: string): Promise<string> {
   const key = await getCryptoKey();
-  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_SIZE));
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: nonce },
-      key,
-      new TextEncoder().encode(plaintext),
-    ),
+  // Explicit ArrayBuffer cho cả nonce, plaintext, combined — tránh ArrayBufferLike widening.
+  const nonce = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(NONCE_SIZE)));
+  const plaintextBytes = new TextEncoder().encode(plaintext);
+  const ciphertextBuf = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce },
+    key,
+    plaintextBytes,
   );
-  const combined = new Uint8Array(NONCE_SIZE + ciphertext.length);
+  const ciphertext = new Uint8Array(ciphertextBuf);
+  const combined = new Uint8Array(new ArrayBuffer(NONCE_SIZE + ciphertext.length));
   combined.set(nonce, 0);
   combined.set(ciphertext, NONCE_SIZE);
   return bytesToBase64(combined);
