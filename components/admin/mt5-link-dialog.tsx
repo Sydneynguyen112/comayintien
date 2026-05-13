@@ -5,7 +5,7 @@
 // không bị race với cloudPush.machine fire-and-forget.
 
 import { useState } from "react";
-import { Activity, Plug } from "lucide-react";
+import { Activity, Eye, EyeOff, Plug } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [server, setServer] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,6 +39,7 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
     setLogin("");
     setPassword("");
     setServer("");
+    setShowPassword(false);
     setError(null);
   }
 
@@ -113,16 +115,27 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
 
           <Field
             label="MT5 Investor Password"
-            hint="Password CHỈ ĐỌC — KHÔNG phải master password."
+            hint="Password CHỈ ĐỌC — KHÔNG phải master password. Click icon mắt để hiện/ẩn."
           >
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className="h-11 text-base"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className="h-11 text-base pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? "Ẩn password" : "Hiện password"}
+                className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </Field>
 
           <Field label="MT5 Server" hint="Tên server broker chính xác">
