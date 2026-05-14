@@ -1,12 +1,11 @@
 "use client";
 
-// Footer hiển thị MT5 status cho 1 cỗ máy ở customer view.
-// - Chưa link → nút "Liên kết MT5" (chỉ customer thấy, mentor/admin chỉ thấy badge)
-// - Đã link → chỉ badge trạng thái, KHÔNG hiện login/password/balance
-// Khách phải biết: máy này đã được link MT5, đang sync mỗi 5 phút, lỗi thì alert.
+// Compact footer cho card cỗ máy trong list view — show MT5 status hoặc nút link.
+// Không có helper text inline (gây overflow grid trước đây).
+// Customer/admin chỉ thấy badge trạng thái, KHÔNG thấy login/password/balance.
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Plug, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Mt5LinkDialog } from "@/components/admin/mt5-link-dialog";
@@ -15,21 +14,21 @@ interface Props {
   machineId: string;
   machineName: string;
   userId: string;
-  canLink: boolean;     // true cho customer view, false cho mentor/admin
+  canLink: boolean;
 }
 
 type Status = "loading" | "unlinked" | "linked";
 
 interface LinkedInfo {
-  accountStatus: string;        // active | pending | error | disabled
+  accountStatus: string;
   lastError: string | null;
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; tone: string; label: string }> = {
-  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",  label: "MT5 đang đồng bộ" },
-  pending:  { icon: Clock,        tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",          label: "MT5 chờ sync lần đầu" },
-  error:    { icon: XCircle,      tone: "text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/30",                  label: "MT5 lỗi kết nối" },
-  disabled: { icon: AlertCircle,  tone: "text-muted-foreground bg-muted border-border",                                    label: "MT5 đã tắt" },
+  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",  label: "MT5 đang sync" },
+  pending:  { icon: Clock,        tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",          label: "MT5 chờ sync" },
+  error:    { icon: XCircle,      tone: "text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/30",                  label: "MT5 lỗi" },
+  disabled: { icon: AlertCircle,  tone: "text-muted-foreground bg-muted border-border",                                    label: "MT5 tắt" },
 };
 
 export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Props) {
@@ -71,41 +70,42 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
   }
 
   if (status === "unlinked") {
-    if (!canLink) return null;        // mentor/admin xem không cần thấy
+    if (!canLink) {
+      return (
+        <div className="text-[11px] text-muted-foreground italic px-1">
+          Chưa kết nối MT5
+        </div>
+      );
+    }
     return (
-      <div className="flex items-center gap-2 px-1">
-        <Mt5LinkDialog
-          userId={userId}
-          machineId={machineId}
-          machineName={machineName}
-          onLinked={loadStatus}
-        />
-        <span className="text-[11px] italic text-muted-foreground">
-          Tuỳ chọn: kết nối MT5 để hệ thống tự đồng bộ kỷ luật
-        </span>
-      </div>
+      <Mt5LinkDialog
+        userId={userId}
+        machineId={machineId}
+        machineName={machineName}
+        onLinked={loadStatus}
+      />
     );
   }
 
-  // Linked — chỉ badge, không lộ credentials
   const cfg = STATUS_CONFIG[info!.accountStatus] ?? STATUS_CONFIG.pending;
   const Icon = cfg.icon;
+  const isError = info!.accountStatus === "error";
 
   return (
     <div
       className={cn(
-        "rounded-lg border px-3 py-1.5 text-xs flex items-center gap-2",
+        "rounded-lg border px-2.5 py-1.5 text-[11px] flex items-center gap-1.5 w-full",
         cfg.tone,
       )}
+      title={info!.lastError ?? cfg.label}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
-      <span className="font-medium">{cfg.label}</span>
-      {info!.lastError && info!.accountStatus === "error" && (
-        <span className="italic text-muted-foreground truncate">
-          — {info!.lastError.length > 80 ? info!.lastError.slice(0, 80) + "…" : info!.lastError}
+      <span className="font-medium truncate">{cfg.label}</span>
+      {isError && info!.lastError && (
+        <span className="italic text-[10px] truncate min-w-0 opacity-80">
+          {info!.lastError.slice(0, 30)}…
         </span>
       )}
-      <Activity className="h-3 w-3 ml-auto opacity-50" />
     </div>
   );
 }

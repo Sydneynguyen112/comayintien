@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
 import { MachineAnchorStrip } from "./machine-anchor-strip";
 import { MachineBalanceBreakdown } from "./machine-balance-breakdown";
+import { MachineMt5Panel } from "./machine-mt5-panel";
 import { MachineEquityCurve } from "./machine-equity-curve";
 import { TradeJournal } from "./trade-journal";
 import { WithdrawJournal } from "./withdraw-journal";
@@ -288,6 +289,15 @@ export function MachineDetailView({
           totalWithdrawn={withdrawnAbs}
         />
       </div>
+
+      {/* MT5 Monitoring panel */}
+      <MachineMt5Panel
+        machineId={machineId}
+        machineName={machine.name}
+        userId={resolvedOwner}
+        canLink={role === "client" && !readOnly}
+        showCredentials={role === "admin" || role === "mentor"}
+      />
 
       {/* Trade journal */}
       <TradeJournal
