@@ -46,11 +46,13 @@ const tabConfig: { key: Tab; label: string; tone: string }[] = [
 const roleLabels: Record<string, string> = {
   student: "Khách hàng",
   mentor: "Mentor",
+  admin:  "Admin",
 };
 
 const roleStyles: Record<string, string> = {
   student: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
-  mentor: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  mentor:  "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  admin:   "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
 };
 
 const statusStyles: Record<UserStatus, string> = {
@@ -69,11 +71,13 @@ export default function AdminKhachHangPage() {
 
   async function loadData() {
     setLoading(true);
+    // Lấy TẤT CẢ users — admin/mentor/student đều có thể có cỗ máy.
+    // Trang giờ tập trung quản lý CỖ MÁY thay vì chỉ khách hàng.
     const [{ data: profiles }, { data: access }] = await Promise.all([
       supabase
         .from("profiles")
         .select("*")
-        .in("role", ["student", "mentor"])
+        .in("role", ["student", "mentor", "admin"])
         .order("created_at", { ascending: false }),
       supabase
         .from("apps_access")
@@ -141,10 +145,10 @@ export default function AdminKhachHangPage() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
-              <span className="gold-gradient-text">Khách hàng & Mentor</span>
+              <span className="gold-gradient-text">Quản lý cỗ máy</span>
             </h1>
             <p className="mt-0.5 text-muted-foreground text-sm">
-              Duyệt yêu cầu truy cập, khoá, mở lại quyền Cỗ Máy In Tiền
+              Tất cả users (khách hàng, mentor, admin) — duyệt quyền truy cập, xem cỗ máy & MT5
             </p>
           </div>
         </div>
