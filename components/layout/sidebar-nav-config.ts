@@ -31,7 +31,7 @@ export const mentorNav: NavItem[] = clientMentorNav("mentor");
 
 export const adminNav: NavItem[] = [
   { href: "/admin/crm", label: "Dashboard", icon: ChartLine },
-  { href: "/admin/khach-hang", label: "Quản lý khách hàng", icon: Users },
+  { href: "/admin/khach-hang", label: "Quản lý cỗ máy", icon: Users },
   { href: "/client/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
 ];
