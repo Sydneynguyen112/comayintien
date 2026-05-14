@@ -275,7 +275,7 @@ export default function AdminUserDetailPage() {
           <KpiCard icon={Activity} label="Hoạt động cuối" value={timeSince(access?.last_seen_at ?? null)} hint="Cỗ Máy" tone="text-foreground" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Profile + actions */}
           <Card className="lg:col-span-1">
             <CardContent className="pt-6 space-y-4">
@@ -322,7 +322,7 @@ export default function AdminUserDetailPage() {
           </Card>
 
           {/* Machines + Activity */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -334,7 +334,7 @@ export default function AdminUserDetailPage() {
                   User chưa tạo cỗ máy nào.
                 </p>
               ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <div className="space-y-4">
                   {machines.map((m) => (
                     <CustomerMachineCard
                       key={m.id}

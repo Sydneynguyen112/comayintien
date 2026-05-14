@@ -4,7 +4,7 @@ import { Activity, Anchor, ArrowDown, ArrowUp, CheckCircle2, Clock, Coins, Trend
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Mt5LinkDialog } from "./mt5-link-dialog";
-import { Mt5ActivityLog } from "./mt5-activity-log";
+import { MachineActivityCompare } from "./machine-activity-compare";
 
 export interface MachineLite {
   id: string;
@@ -168,23 +168,13 @@ export function CustomerMachineCard({ machine, transactions, userId, mt5, onMt5C
         </div>
       </div>
 
-      {/* MT5 monitoring */}
+      {/* MT5 monitoring status */}
       <div className="border-t border-border pt-3 space-y-2">
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
           <Activity className="h-3 w-3" /> MT5 Giám sát
         </div>
         {mt5 ? (
-          <>
-            <Mt5StatusBlock mt5={mt5} />
-            <details className="group">
-              <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
-                ▸ Xem log hoạt động MT5 (so sánh với log của khách)
-              </summary>
-              <div className="mt-2">
-                <Mt5ActivityLog mt5AccountId={mt5.accountId} machineId={machine.id} />
-              </div>
-            </details>
-          </>
+          <Mt5StatusBlock mt5={mt5} />
         ) : (
           <Mt5LinkDialog
             userId={userId}
@@ -193,6 +183,11 @@ export function CustomerMachineCard({ machine, transactions, userId, mt5, onMt5C
             onLinked={onMt5Changed}
           />
         )}
+      </div>
+
+      {/* Activity compare — manual log vs MT5 thực tế, ALWAYS visible */}
+      <div className="border-t border-border pt-3">
+        <MachineActivityCompare machineId={machine.id} mt5AccountId={mt5?.accountId ?? null} daysBack={30} />
       </div>
 
       {/* Anchor history */}
