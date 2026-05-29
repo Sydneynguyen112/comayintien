@@ -296,6 +296,22 @@ function fire<T>(p: PromiseLike<T>): void {
   );
 }
 
+/**
+ * Upsert 1 machine lên cloud và AWAIT kết quả (khác cloudPush.machine fire-and-forget).
+ * Dùng khi cần chắc chắn máy đã lên DB trước khi thao tác tham chiếu FK
+ * (vd: đăng ký giải đấu insert tournament_registrations.machine_id).
+ */
+export async function pushMachineNow(
+  userId: string,
+  m: Machine,
+): Promise<{ error: { message?: string } | null }> {
+  if (!userId) return { error: null };
+  const res = await supabase
+    .from("comay_machines")
+    .upsert(machineToRow(m, userId), { onConflict: "id" });
+  return { error: res.error };
+}
+
 export const cloudPush = {
   setup(userId: string, s: SetupConfig) {
     if (!userId) return;

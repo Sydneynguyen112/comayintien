@@ -6,6 +6,7 @@ import {
   Users,
   ChartLine,
   Coins,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -21,6 +22,7 @@ function clientMentorNav(urlSlug: "client" | "mentor"): NavItem[] {
   return [
     { href: `/${urlSlug}/co-may/tong-quan`, label: "Tổng quan", icon: LayoutDashboard },
     { href: `/${urlSlug}/co-may/quan-ly`, label: "Cỗ Máy chi tiết", icon: Settings },
+    { href: `/${urlSlug}/co-may/giai-dau`, label: "Giải đấu", icon: Trophy },
     { href: `/${urlSlug}/co-may/lich-su`, label: "Nhật ký hoạt động", icon: FileBarChart },
     { href: `/${urlSlug}/profile`, label: "Hồ sơ", icon: User },
   ];
@@ -32,6 +34,7 @@ export const mentorNav: NavItem[] = clientMentorNav("mentor");
 export const adminNav: NavItem[] = [
   { href: "/admin/crm", label: "Dashboard", icon: ChartLine },
   { href: "/admin/khach-hang", label: "Quản lý cỗ máy", icon: Users },
+  { href: "/admin/giai-dau", label: "Giải đấu", icon: Trophy },
   { href: "/client/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
 ];

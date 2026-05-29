@@ -104,3 +104,55 @@ export interface KpiSnapshot {
   days_active: number;
   trade_count: number;
 }
+
+// ── Giải đấu (Tournaments) ──
+export type TournamentStatus = "draft" | "open" | "ongoing" | "closed";
+export type LeaderboardMetric = "pnl_pct" | "win_rate" | "volume";
+export type RegistrationStatus = "pending" | "approved" | "rejected";
+
+export interface Tournament {
+  id: string;
+  title: string;
+  description?: string | null; // mô tả / rules tự do
+  status: TournamentStatus;
+  leaderboard_metric: LeaderboardMetric;
+  // Ràng buộc đăng ký (NULL/undefined = không ràng buộc). Vốn canonical USD.
+  required_currency?: CurrencyUnit | null;
+  min_capital?: number | null;
+  max_capital?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentRegistration {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  machine_id: string;
+  status: RegistrationStatus;
+  baseline_balance?: number | null; // snapshot lúc duyệt (USD canonical)
+  baseline_at?: string | null;
+  approved_by?: string | null;
+  reject_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 1 dòng leaderboard (tính động, không lưu DB)
+export interface LeaderboardEntry {
+  rank: number;
+  registration_id: string;
+  machine_id: string;
+  machine_name: string;
+  user_id: string;
+  display_name: string;
+  currency_unit: CurrencyUnit;
+  pnl_pct: number;     // % tăng trưởng từ baseline
+  win_rate: number;    // 0..1, trade sau baseline
+  volume: number;      // tổng volume sau baseline
+  trade_count: number;
+  score: number;       // giá trị theo metric của giải (để sort + hiển thị)
+}

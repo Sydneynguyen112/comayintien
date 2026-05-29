@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Settings, LineChart, FileBarChart, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Settings, LineChart, FileBarChart, Trophy, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSeniorMode } from "@/lib/co-may/senior-ui";
 
@@ -17,6 +17,7 @@ interface SubNavTab {
 const TABS: SubNavTab[] = [
   { segment: "tong-quan", label: "Tổng quan", icon: LayoutDashboard },
   { segment: "quan-ly", label: "Cỗ Máy Chi Tiết", icon: Settings },
+  { segment: "giai-dau", label: "Giải đấu", icon: Trophy },
   { segment: "lich-su", label: "Nhật ký hoạt động", icon: FileBarChart },
 ];
 
