@@ -5,9 +5,46 @@ import { supabase } from "@/lib/supabase";
 import type {
   CurrencyUnit,
   LeaderboardEntry,
+  RegistrationStatus,
   Tournament,
   TournamentRegistration,
 } from "./types";
+
+export interface MachineTournamentTag {
+  tournamentId: string;
+  tournamentTitle: string;
+  status: RegistrationStatus; // chỉ pending | approved (rejected bị loại)
+}
+
+/** Map machineId → giải đang tham gia (để gắn tag/highlight ở card cỗ máy). */
+export async function getMachineTournamentMap(
+  machineIds: string[],
+): Promise<Record<string, MachineTournamentTag>> {
+  if (machineIds.length === 0) return {};
+  const { data: regs } = await supabase
+    .from("tournament_registrations")
+    .select("machine_id, tournament_id, status")
+    .in("machine_id", machineIds)
+    .neq("status", "rejected");
+  const list = (regs ?? []) as { machine_id: string; tournament_id: string; status: RegistrationStatus }[];
+  if (list.length === 0) return {};
+  const tids = Array.from(new Set(list.map((r) => r.tournament_id)));
+  const { data: tours } = await supabase.from("tournaments").select("id, title").in("id", tids);
+  const titleById = new Map(((tours ?? []) as { id: string; title: string }[]).map((t) => [t.id, t.title]));
+  const out: Record<string, MachineTournamentTag> = {};
+  for (const r of list) {
+    const prev = out[r.machine_id];
+    // approved ưu tiên hơn pending nếu 1 máy có nhiều đăng ký
+    if (!prev || (prev.status !== "approved" && r.status === "approved")) {
+      out[r.machine_id] = {
+        tournamentId: r.tournament_id,
+        tournamentTitle: titleById.get(r.tournament_id) ?? "Giải đấu",
+        status: r.status,
+      };
+    }
+  }
+  return out;
+}
 
 export async function listTournaments(): Promise<Tournament[]> {
   const { data } = await supabase

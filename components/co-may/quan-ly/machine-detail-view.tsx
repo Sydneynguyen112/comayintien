@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   RefreshCw,
   Trash2,
+  Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrentUser } from "@/lib/auth";
@@ -36,6 +37,7 @@ import { fireworksGrand, FIREWORK_GRAND_DURATION } from "@/lib/co-may/celebrate"
 import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
 import { formatMoney } from "@/lib/co-may/currency";
+import { getMachineTournamentMap, type MachineTournamentTag } from "@/lib/co-may/tournament-data";
 import { MachineAnchorStrip } from "./machine-anchor-strip";
 import { MachineBalanceBreakdown } from "./machine-balance-breakdown";
 import { MachineMt5Panel } from "./machine-mt5-panel";
@@ -67,7 +69,20 @@ export function MachineDetailView({
   const router = useRouter();
   const [tick, setTick] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [tournamentTag, setTournamentTag] = useState<MachineTournamentTag | null>(null);
   const refresh = () => setTick((n) => n + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMachineTournamentMap([machineId])
+      .then((m) => {
+        if (!cancelled) setTournamentTag(m[machineId] ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [machineId, tick]);
 
   // Withdraw dialog state — shared by anchor strip + withdraw journal
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -193,6 +208,20 @@ export function MachineDetailView({
                   <TrendingUp className={cn("h-3 w-3", totalPnl < 0 && "rotate-180")} />
                   {totalPnl > 0 ? "+" : ""}
                   {((totalPnl / machine.capital) * 100).toFixed(1)}%
+                </span>
+              )}
+              {tournamentTag && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-widest border",
+                    tournamentTag.status === "approved"
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                  )}
+                  title={tournamentTag.tournamentTitle}
+                >
+                  <Trophy className="h-3 w-3" />
+                  {tournamentTag.status === "approved" ? "Đang thi đấu" : "Chờ duyệt giải"}
                 </span>
               )}
             </div>

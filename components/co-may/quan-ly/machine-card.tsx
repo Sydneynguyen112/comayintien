@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Sparkles, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
+import type { MachineTournamentTag } from "@/lib/co-may/tournament-data";
 import { formatMoney } from "@/lib/co-may/currency";
 
 const DAY_MS = 86400_000;
@@ -18,11 +19,13 @@ export function MachineCard({
   machine,
   tx,
   detailHref,
+  tournament,
 }: {
   machine: Machine;
   tx: MachineTransaction[];
   detailHref: string;
   role?: string | null;
+  tournament?: MachineTournamentTag;
 }) {
   const fmt = (n: number) => formatMoney(n, machine.currency_unit);
   const cycleStart = new Date(machine.cycle_started_at ?? machine.created_at).getTime();
@@ -43,6 +46,8 @@ export function MachineCard({
   const anchorPct = ((Math.max(minM, Math.min(maxM, machine.current_anchor)) - minM) / range) * 100;
 
   const isClosed = machine.status === "closed";
+  const inTournament = !isClosed && !!tournament;
+  const tournamentApproved = inTournament && tournament!.status === "approved";
   const overflow = balance - machine.current_anchor;
   const underflow = -overflow;
   const showOverflowCta = !isClosed && overflow > 0;
@@ -55,7 +60,9 @@ export function MachineCard({
         "group block rounded-2xl border bg-card hover:shadow-sm transition-all p-5 space-y-4",
         isClosed
           ? "border-dashed border-border/60 opacity-90 hover:border-foreground/40"
-          : "border-border hover:border-primary/40",
+          : tournamentApproved
+            ? "border-primary/60 ring-1 ring-primary/25 bg-primary/[0.03] hover:border-primary"
+            : "border-border hover:border-primary/40",
       )}
     >
       {/* Header */}
@@ -90,6 +97,20 @@ export function MachineCard({
           <p className="text-[11px] text-muted-foreground mt-0.5 uppercase tracking-wider">
             {machine.method ?? "—"} · {SIGNAL_LABEL[machine.signal_source ?? "self"] ?? "—"}
           </p>
+          {inTournament && (
+            <span
+              className={cn(
+                "mt-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                tournamentApproved
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+              )}
+              title={tournament!.tournamentTitle}
+            >
+              <Trophy className="h-3 w-3" />
+              {tournamentApproved ? "Đang thi đấu" : "Chờ duyệt giải"}
+            </span>
+          )}
         </div>
         <span
           className={cn(

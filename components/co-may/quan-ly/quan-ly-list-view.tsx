@@ -9,6 +9,7 @@ import {
   getUserScope,
 } from "@/lib/co-may/mock-data";
 import { getSetup } from "@/lib/co-may/setup-store";
+import { getMachineTournamentMap, type MachineTournamentTag } from "@/lib/co-may/tournament-data";
 import type { CycleReport, Machine, MachineTransaction } from "@/lib/co-may/types";
 import { MachineCard } from "./machine-card";
 import { ClosedMachineCard } from "./closed-machine-card";
@@ -28,6 +29,7 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
   const [machineMap, setMachineMap] = useState<{ ownerId: string; m: Machine }[]>([]);
   const [tx, setTx] = useState<MachineTransaction[]>([]);
   const [reports, setReports] = useState<CycleReport[]>([]);
+  const [tournamentMap, setTournamentMap] = useState<Record<string, MachineTournamentTag>>({});
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -44,6 +46,10 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
     setMachineMap(allMachines);
     setTx(allTx);
     setReports(allReports);
+    // Gắn tag giải đấu cho các máy (đọc Supabase, không chặn render)
+    getMachineTournamentMap(allMachines.map(({ m }) => m.id))
+      .then(setTournamentMap)
+      .catch(() => setTournamentMap({}));
   }, [user, role, tick]);
 
   if (!user) {
@@ -130,6 +136,7 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
                           tx={tx.filter((t) => t.machine_id === m.id)}
                           detailHref={`/${role}/co-may/quan-ly/${m.id}?owner=${ownerId}`}
                           role={role}
+                          tournament={tournamentMap[m.id]}
                         />
                         <MachineMt5Footer
                           machineId={m.id}
