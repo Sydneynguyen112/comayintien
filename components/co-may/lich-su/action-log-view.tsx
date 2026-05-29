@@ -13,15 +13,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CycleReport, Machine, MachineTransaction } from "@/lib/co-may/types";
+import type { CurrencyUnit, CycleReport, Machine, MachineTransaction } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 import { TxFilters, DEFAULT_TX_FILTER, type TxFilterState } from "./tx-filters";
 import { downloadCsv } from "./csv-export";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 const DAY_MS = 86400_000;
 
@@ -44,6 +39,8 @@ interface ActionRow {
   newAnchor?: number;
   startingCapital?: number;
   endingBalance?: number;
+  /** Đơn vị hiển thị của cỗ máy (USD/USC) để format giá trị đúng. */
+  unit?: CurrencyUnit;
   /** ms từ lúc cỗ máy được mở (cycle_started_at) tới timestamp này. */
   elapsedMs?: number;
 }
@@ -77,6 +74,10 @@ export function ActionLogView({
     () => new Map(machines.map((m) => [m.id, m.name])),
     [machines],
   );
+  const machineUnitById = useMemo(
+    () => new Map(machines.map((m) => [m.id, m.currency_unit])),
+    [machines],
+  );
   const machineCycleStart = useMemo(() => {
     const map = new Map<string, number>();
     for (const m of machines) {
@@ -107,8 +108,9 @@ export function ActionLogView({
         machineId: m.id,
         machineName: m.name,
         type: "open",
-        description: `Khởi tạo với vốn ${usd.format(m.capital)}`,
+        description: `Khởi tạo với vốn ${formatMoney(m.capital, m.currency_unit)}`,
         startingCapital: m.capital,
+        unit: m.currency_unit,
         elapsedMs: 0,
       });
     }
@@ -132,8 +134,9 @@ export function ActionLogView({
         machineId: m.id,
         machineName: m.name,
         type: "close",
-        description: `Quyết định: ${decisionLabel} · Số dư hiện tại: ${usd.format(ending)}`,
+        description: `Quyết định: ${decisionLabel} · Số dư hiện tại: ${formatMoney(ending, m.currency_unit)}`,
         endingBalance: ending,
+        unit: m.currency_unit,
         elapsedMs: Math.max(0, new Date(ts).getTime() - cycleStart),
       });
     }
@@ -159,12 +162,13 @@ export function ActionLogView({
         description,
         amount: type === "anchor_change" ? undefined : t.amount,
         newAnchor: type === "anchor_change" ? extractNewAnchor(t.note) : undefined,
+        unit: machineUnitById.get(t.machine_id),
         elapsedMs: elapsed,
       };
       rows.push(row);
     }
     return rows.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  }, [tx, machines, machineNameById, machineCycleStart, reportByMachineId]);
+  }, [tx, machines, machineNameById, machineUnitById, machineCycleStart, reportByMachineId]);
 
   const filtered = useMemo(() => {
     const cutoff = filter.dateRange === "all" ? 0 : Date.now() - Number(filter.dateRange) * DAY_MS;
@@ -277,37 +281,38 @@ export function ActionLogView({
 }
 
 function renderValue(a: ActionRow) {
+  const money = (n: number) => formatMoney(n, a.unit);
   if (a.type === "open") {
-    return <span className="text-foreground font-semibold">{usd.format(a.startingCapital ?? 0)}</span>;
+    return <span className="text-foreground font-semibold">{money(a.startingCapital ?? 0)}</span>;
   }
   if (a.type === "close") {
     return (
-      <span className="text-foreground font-semibold">{usd.format(a.endingBalance ?? 0)}</span>
+      <span className="text-foreground font-semibold">{money(a.endingBalance ?? 0)}</span>
     );
   }
   if (a.type === "anchor_change") {
     return (
       <span className="text-primary font-semibold">
-        {a.newAnchor !== undefined ? usd.format(a.newAnchor) : "—"}
+        {a.newAnchor !== undefined ? money(a.newAnchor) : "—"}
       </span>
     );
   }
   if (a.type === "withdraw") {
     return (
       <span className="text-[#3B6C4F] dark:text-[#5C9C75] font-semibold">
-        {usd.format(a.amount ?? 0)}
+        {money(a.amount ?? 0)}
       </span>
     );
   }
   if (a.type === "trade_win") {
     return (
       <span className="text-[#3B6C4F] dark:text-[#5C9C75] font-semibold">
-        +{usd.format(a.amount ?? 0)}
+        +{money(a.amount ?? 0)}
       </span>
     );
   }
   if (a.type === "trade_loss") {
-    return <span className="text-foreground font-semibold">{usd.format(a.amount ?? 0)}</span>;
+    return <span className="text-foreground font-semibold">{money(a.amount ?? 0)}</span>;
   }
   return <Coins className="inline h-3 w-3 text-muted-foreground" />;
 }

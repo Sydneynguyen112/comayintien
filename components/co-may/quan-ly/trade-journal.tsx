@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn, formatDate } from "@/lib/utils";
-import { recordTransaction } from "@/lib/co-may/mock-data";
+import { recordTransaction, updateTransaction } from "@/lib/co-may/mock-data";
 import type { CurrencyUnit, MachineTransaction, TradeDirection } from "@/lib/co-may/types";
-import { formatMoney } from "@/lib/co-may/currency";
+import { formatMoney, resolveUnit, toDisplay, toUSD, UNIT_SYMBOL } from "@/lib/co-may/currency";
 import { SymbolCombobox } from "./symbol-combobox";
 
 interface Props {
@@ -49,9 +49,40 @@ const INITIAL_FORM: TradeFormState = {
 
 export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly }: Props) {
   const fmt = (n: number) => formatMoney(n, unit);
+  const unitSym = UNIT_SYMBOL[resolveUnit(unit)];
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<TradeFormState>(INITIAL_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(INITIAL_FORM);
+    setError(null);
+    setOpen(true);
+  }
+
+  function openEdit(t: MachineTransaction) {
+    setEditingId(t.id);
+    setForm({
+      direction: t.direction ?? "long",
+      symbol: t.symbol ?? "",
+      volume: t.volume != null ? String(t.volume) : "",
+      pnl: String(Math.round(toDisplay(t.amount, unit) * 100) / 100),
+      entryReason: t.entry_reason ?? "",
+      exitReason: t.exit_reason ?? "",
+      emotion: t.emotion ?? "",
+    });
+    setError(null);
+    setOpen(true);
+  }
+
+  function closeDialog() {
+    setOpen(false);
+    setForm(INITIAL_FORM);
+    setEditingId(null);
+    setError(null);
+  }
 
   const trades = tx
     .filter((t) => t.type === "trade_win" || t.type === "trade_loss")
@@ -80,19 +111,24 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
     if (!Number.isFinite(pnlNum) || pnlNum === 0) {
       return setError("PNL phải là số ≠ 0");
     }
-    recordTransaction(ownerId, machineId, {
-      type: pnlNum > 0 ? "trade_win" : "trade_loss",
-      amount: pnlNum,
+    // PNL nhập theo đơn vị hiển thị của máy (USD/¢) → quy về USD canonical để lưu,
+    // giống vốn & rút tiền. Nếu không, máy cent nhập 45¢ sẽ bị lưu thành $45.
+    const payload = {
+      type: (pnlNum > 0 ? "trade_win" : "trade_loss") as MachineTransaction["type"],
+      amount: toUSD(pnlNum, unit),
       direction: form.direction,
       symbol: form.symbol.trim() || undefined,
       volume: Number.isFinite(volNum) && volNum > 0 ? volNum : undefined,
       entry_reason: form.entryReason.trim() || undefined,
       exit_reason: form.exitReason.trim() || undefined,
       emotion: form.emotion.trim() || undefined,
-    });
-    setForm(INITIAL_FORM);
-    setError(null);
-    setOpen(false);
+    };
+    if (editingId) {
+      updateTransaction(ownerId, editingId, payload);
+    } else {
+      recordTransaction(ownerId, machineId, payload);
+    }
+    closeDialog();
     onChange();
   }
 
@@ -110,7 +146,7 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
             type="button"
             variant="anchor"
             size="sm"
-            onClick={() => setOpen(true)}
+            onClick={openCreate}
             className="shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -127,16 +163,17 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
               <Th>Hướng</Th>
               <Th>Cặp / Mã</Th>
               <Th align="right">Khối lượng</Th>
-              <Th align="right">PNL ($)</Th>
+              <Th align="right">PNL ({unitSym})</Th>
               <Th>Lý do vào</Th>
               <Th>Lý do thoát</Th>
               <Th>Cảm xúc</Th>
+              {!readOnly && <Th align="right">Sửa</Th>}
             </tr>
           </thead>
           <tbody>
             {trades.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-sm italic text-muted-foreground">
+                <td colSpan={readOnly ? 8 : 9} className="px-5 py-8 text-center text-sm italic text-muted-foreground">
                   Chưa có giao dịch nào.
                 </td>
               </tr>
@@ -175,6 +212,19 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
                     <Td>{t.entry_reason ?? "—"}</Td>
                     <Td>{t.exit_reason ?? "—"}</Td>
                     <Td className="italic text-muted-foreground">{t.emotion ?? "—"}</Td>
+                    {!readOnly && (
+                      <Td align="right">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(t)}
+                          className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          title="Điều chỉnh lệnh"
+                          aria-label="Điều chỉnh lệnh"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </Td>
+                    )}
                   </tr>
                 );
               })
@@ -186,16 +236,13 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
       <Dialog
         open={open}
         onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) {
-            setForm(INITIAL_FORM);
-            setError(null);
-          }
+          if (!v) closeDialog();
+          else setOpen(true);
         }}
       >
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ghi nhận lệnh mới</DialogTitle>
+            <DialogTitle>{editingId ? "Điều chỉnh lệnh" : "Ghi nhận lệnh mới"}</DialogTitle>
             <DialogDescription>
               <span className="text-destructive">*</span> bắt buộc · còn lại là tùy chọn (lý do, cảm xúc)
             </DialogDescription>
@@ -232,7 +279,7 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
                   required
                 />
               </Field>
-              <Field label="PNL ($)" required>
+              <Field label={`PNL (${unitSym})`} required>
                 <Input
                   type="number"
                   step="0.01"
@@ -280,21 +327,13 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
             )}
 
             <DialogFooter className="-mx-4 -mb-4 mt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setOpen(false);
-                  setForm(INITIAL_FORM);
-                  setError(null);
-                }}
-              >
+              <Button type="button" variant="outline" onClick={closeDialog}>
                 <X className="h-3.5 w-3.5" />
                 Huỷ
               </Button>
               <Button type="submit" variant="anchor">
-                <Plus className="h-3.5 w-3.5" />
-                Ghi nhận
+                {editingId ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                {editingId ? "Lưu thay đổi" : "Ghi nhận"}
               </Button>
             </DialogFooter>
           </form>

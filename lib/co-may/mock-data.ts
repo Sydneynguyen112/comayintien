@@ -310,6 +310,33 @@ export function deleteMachine(userId: string, machineId: string): void {
   cloudPush.deleteMachine(userId, machineId);
 }
 
+export function updateTransaction(
+  userId: string,
+  txId: string,
+  patch: Partial<
+    Pick<
+      MachineTransaction,
+      | "type"
+      | "amount"
+      | "note"
+      | "direction"
+      | "symbol"
+      | "volume"
+      | "entry_reason"
+      | "exit_reason"
+      | "emotion"
+    >
+  >,
+): MachineTransaction {
+  const data = getDataFor(userId);
+  const idx = data.tx.findIndex((t) => t.id === txId);
+  if (idx === -1) throw new Error(`Tx ${txId} not found`);
+  data.tx[idx] = { ...data.tx[idx], ...patch };
+  persistDataFor(userId);
+  cloudPush.tx(userId, data.tx[idx]);
+  return data.tx[idx];
+}
+
 export function recordTransaction(
   userId: string,
   machineId: string,
