@@ -31,23 +31,31 @@ export function toDisplay(usdAmount: number, unit?: CurrencyUnit): number {
 /** Giá trị người dùng nhập (theo đơn vị) → USD canonical để lưu. */
 export function toUSD(displayAmount: number, unit?: CurrencyUnit): number {
   if (!Number.isFinite(displayAmount)) return 0;
-  const usd = resolveUnit(unit) === "USC" ? displayAmount / USC_PER_USD : displayAmount;
-  // làm tròn 2 chữ số (1 cent = $0.01) để tránh sai số dấu phẩy động
-  return Math.round(usd * 100) / 100;
+  // Giữ 2 chữ số thập phân THEO ĐƠN VỊ HIỂN THỊ trước khi quy về USD canonical:
+  //   USD: 2 dp = $0.01   |   cent: 2 dp = 0.01¢ = $0.0001
+  // Nhờ vậy PNL 78.85¢ không bị làm tròn thành 79¢, và $45.67 không thành $46.
+  const rounded = Math.round(displayAmount * 100) / 100;
+  return resolveUnit(unit) === "USC" ? rounded / USC_PER_USD : rounded;
 }
 
+// Hiển thị tới 2 chữ số thập phân. minimumFractionDigits = 0 để số tròn vẫn gọn
+// (vd "$1,000", "2,000 ¢") — chỉ hiện thập phân khi có phần lẻ (PNL, số dư lẻ).
 const usdFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
 });
 
-const uscFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const uscFmt = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
 
 /** Format 1 số tiền USD canonical sang chuỗi hiển thị theo đơn vị của cỗ máy. */
 export function formatMoney(usdAmount: number, unit?: CurrencyUnit): string {
   if (resolveUnit(unit) === "USC") {
-    return `${uscFmt.format(Math.round(usdAmount * USC_PER_USD))} ¢`;
+    return `${uscFmt.format(usdAmount * USC_PER_USD)} ¢`;
   }
   return usdFmt.format(usdAmount);
 }
