@@ -4,8 +4,8 @@
 // Phong phú hơn footer ở list view: status + last_synced + (admin/owner) link button.
 // Customer view: chỉ status + last_sync, KHÔNG hiện login/password/balance.
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Anchor, CheckCircle2, Clock, RefreshCcw, XCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertCircle, Anchor, CheckCircle2, Clock, RefreshCcw, Sparkles, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Mt5LinkDialog } from "@/components/admin/mt5-link-dialog";
@@ -49,6 +49,8 @@ function timeSince(iso: string | null): string {
 export function MachineMt5Panel({ machineId, machineName, userId, canLink, showCredentials = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<MT5State | null>(null);
+  const [justConnected, setJustConnected] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,9 +71,15 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
       .eq("id", linkRes.data.mt5_account_id)
       .maybeSingle();
     if (accRes.data) {
+      const newStatus = (accRes.data.status as string) ?? "pending";
+      // Phát hiện khoảnh khắc kết nối thành công lần đầu: pending → active.
+      if (prevStatusRef.current === "pending" && newStatus === "active") {
+        setJustConnected(true);
+      }
+      prevStatusRef.current = newStatus;
       setState({
         accountId: accRes.data.id,
-        status: accRes.data.status ?? "pending",
+        status: newStatus,
         lastError: accRes.data.last_error,
         lastSyncedAt: accRes.data.last_synced_at,
         login: showCredentials ? accRes.data.login : null,
@@ -82,6 +90,20 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
   }, [machineId, showCredentials]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Poll mỗi 15s khi status còn 'pending' (chờ daemon sync lần đầu) — dừng khi đã 'active'.
+  useEffect(() => {
+    if (state?.status !== "pending") return;
+    const interval = setInterval(() => load(), 15000);
+    return () => clearInterval(interval);
+  }, [state?.status, load]);
+
+  // Banner ăn mừng auto-tắt sau 10s.
+  useEffect(() => {
+    if (!justConnected) return;
+    const t = setTimeout(() => setJustConnected(false), 10000);
+    return () => clearTimeout(t);
+  }, [justConnected]);
 
   if (loading) {
     return <div className="rounded-xl border border-border bg-card p-4 h-24 animate-pulse" />;
@@ -121,6 +143,28 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
 
   return (
     <div className={cn("rounded-xl border p-4 space-y-3", cfg.bg)}>
+      {justConnected && (
+        <div className="rounded-lg border-2 border-emerald-500/50 bg-emerald-500/15 px-3 py-2.5 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+          <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+              MT5 đã kết nối thành công!
+            </div>
+            <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+              Hệ thống đang đồng bộ dữ liệu lệnh và nạp/rút từ tài khoản của bạn.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setJustConnected(false)}
+            className="text-emerald-700/60 hover:text-emerald-700 dark:text-emerald-400/60 dark:hover:text-emerald-400 text-xs"
+            aria-label="Đóng"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 justify-between">
         <div className="flex items-center gap-2">
           <Anchor className="h-4 w-4 text-muted-foreground" />
