@@ -222,13 +222,13 @@ export default function AdminMt5Page() {
         {/* Setup guide */}
         <Card className="bg-muted/20">
           <CardContent className="pt-4 pb-4 space-y-2">
-            <h3 className="text-sm font-semibold">Setup mt5-bridge sync</h3>
+            <h3 className="text-sm font-semibold">Setup sync qua EA MT5SupabaseSync</h3>
             <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Thêm MT5 account ở trên → copy <code>id</code> ở section expand.</li>
-              <li>Trong <code>mt5-bridge/.env</code> set <code>MT5_ACCOUNT_LOGIN</code>, <code>MT5_ACCOUNT_PASSWORD</code>, <code>MT5_ACCOUNT_SERVER</code>.</li>
-              <li>Set <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> trong cùng .env.</li>
-              <li>Chạy <code>python test_sync.py</code> — MT5 terminal phải đang chạy. Sẽ sync trades + transactions vào DB.</li>
-              <li>Reload page này → click expand account → thấy log hoạt động.</li>
+              <li>Thêm MT5 account ở trên → copy <code>id</code> ở section expand (chính là <code>MT5_ACCOUNT_ID</code>).</li>
+              <li>Trên VPS: mở MT5 → File → Open Data Folder → copy <code>MT5SupabaseSync.mq5</code> vào <code>MQL5\Experts\</code> → F7 compile (0 errors).</li>
+              <li>Tools → Options → Expert Advisors → tick "Allow WebRequest for listed URL" → thêm <code>https://uxmrvrwaotmctthjiotw.supabase.co</code>.</li>
+              <li>Kéo EA vào 1 chart → điền <code>SUPABASE_ANON_KEY</code> + <code>MT5_ACCOUNT_ID</code>. Smiley 😀 góc phải = đang chạy.</li>
+              <li>Reload page này → click expand account → thấy balance/equity + log hoạt động.</li>
             </ol>
           </CardContent>
         </Card>
