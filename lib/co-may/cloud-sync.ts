@@ -320,6 +320,11 @@ export const cloudPush = {
   },
   deleteMachine(userId: string, machineId: string) {
     if (!userId) return;
+    // Xoá toàn bộ lãi/lỗ của máy: transactions (có cascade nhưng xoá tường minh cho
+    // chắc) + reports (comay_reports.machine_id KHÔNG có FK cascade → phải xoá tay,
+    // nếu không sẽ mồ côi trên cloud và quay lại sau hydrate).
+    fire(supabase.from("comay_transactions").delete().eq("machine_id", machineId));
+    fire(supabase.from("comay_reports").delete().eq("machine_id", machineId));
     fire(supabase.from("comay_machines").delete().eq("id", machineId));
   },
   tx(userId: string, t: MachineTransaction) {

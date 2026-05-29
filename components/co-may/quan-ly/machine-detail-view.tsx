@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Wallet,
@@ -10,11 +11,21 @@ import {
   Activity,
   ArrowUpRight,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  deleteMachine,
   getMachineById,
   getTxByMachine,
   getUserScope,
@@ -53,7 +64,9 @@ export function MachineDetailView({
   ownerId?: string;
 }) {
   const user = useCurrentUser(role);
+  const router = useRouter();
   const [tick, setTick] = useState(0);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const refresh = () => setTick((n) => n + 1);
 
   // Withdraw dialog state — shared by anchor strip + withdraw journal
@@ -136,6 +149,14 @@ export function MachineDetailView({
 
   const readOnly = role !== "client" || resolvedOwner !== user.id;
 
+  function handleDelete() {
+    // Xoá máy → vốn (capital) tự quay về vốn dự trữ vì reserve = totalCapital − Σ(vốn máy đang mở).
+    // deleteMachine cũng xoá toàn bộ tx + reports = xoá hết lãi/lỗ của máy.
+    deleteMachine(resolvedOwner, machineId);
+    setDeleteOpen(false);
+    router.push(`/${role}/co-may/quan-ly`);
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -180,16 +201,26 @@ export function MachineDetailView({
             </p>
           </div>
 
-          {!readOnly && machine.status !== "closed" && (
+          {!readOnly && (
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href={`/${role}/co-may/quan-ly/${machineId}/dong-chu-ky?owner=${resolvedOwner}`}
+              {machine.status !== "closed" && (
+                <Link
+                  href={`/${role}/co-may/quan-ly/${machineId}/dong-chu-ky?owner=${resolvedOwner}`}
+                >
+                  <Button variant="anchor" size="default">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Đóng chu kỳ và lập báo cáo
+                  </Button>
+                </Link>
+              )}
+              <Button
+                variant="destructive"
+                size="default"
+                onClick={() => setDeleteOpen(true)}
               >
-                <Button variant="anchor" size="default">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Đóng chu kỳ và lập báo cáo
-                </Button>
-              </Link>
+                <Trash2 className="h-3.5 w-3.5" />
+                Xoá cỗ máy
+              </Button>
             </div>
           )}
         </div>
@@ -323,6 +354,40 @@ export function MachineDetailView({
         unit={unit}
         onSuccess={refresh}
       />
+
+      {/* Xác nhận xoá cỗ máy */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xoá cỗ máy &ldquo;{machine.name}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              Đóng cỗ máy và hoàn vốn — không thể khôi phục.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <span className="text-muted-foreground">Vốn trả về vốn dự trữ</span>
+              <span className="font-semibold tabular-nums text-[#3B6C4F] dark:text-[#5C9C75]">
+                + {fmt(machine.capital)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Toàn bộ lãi/lỗ của cỗ máy này (lệnh, nạp/rút, báo cáo chu kỳ) sẽ bị xoá
+              vĩnh viễn. Chỉ phần vốn gốc {fmt(machine.capital)} được trả lại vào vốn dự
+              trữ để phân bổ cho cỗ máy khác.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+              Huỷ
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete}>
+              <Trash2 className="h-3.5 w-3.5" />
+              Xoá vĩnh viễn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* GIỮ VỐN encouragement popup */}
       <AnimatePresence>

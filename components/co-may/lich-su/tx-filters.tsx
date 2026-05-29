@@ -61,7 +61,7 @@ export function TxFilters({
       <select
         value={filter.machineId}
         onChange={(e) => onChange({ ...filter, machineId: e.target.value })}
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+        className="h-8 rounded-lg border border-input bg-background text-foreground px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
       >
         <option value="all">Tất cả cỗ máy</option>
         {machines.map((m) => (
@@ -74,7 +74,7 @@ export function TxFilters({
       <select
         value={filter.dateRange}
         onChange={(e) => onChange({ ...filter, dateRange: e.target.value as DateRange })}
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+        className="h-8 rounded-lg border border-input bg-background text-foreground px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
       >
         {DATE_OPTIONS.map((d) => (
           <option key={d.value} value={d.value}>
@@ -86,7 +86,7 @@ export function TxFilters({
       <select
         value={filter.type}
         onChange={(e) => onChange({ ...filter, type: e.target.value as TxFilterState["type"] })}
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+        className="h-8 rounded-lg border border-input bg-background text-foreground px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
       >
         {TYPE_OPTIONS.map((t) => (
           <option key={t.value} value={t.value}>

@@ -33,7 +33,7 @@ export function BaoCaoTab({
         <select
           value={machineId}
           onChange={(e) => setMachineId(e.target.value)}
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+          className="h-8 rounded-lg border border-input bg-background text-foreground px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
         >
           <option value="all">Tất cả cỗ máy</option>
           {machines.map((m) => (
@@ -45,7 +45,7 @@ export function BaoCaoTab({
         <select
           value={decision}
           onChange={(e) => setDecision(e.target.value as typeof decision)}
-          className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+          className="h-8 rounded-lg border border-input bg-background text-foreground px-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
         >
           <option value="all">Mọi quyết định</option>
           <option value="reset">Chỉ Reset</option>

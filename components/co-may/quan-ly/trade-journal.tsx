@@ -207,7 +207,7 @@ export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly 
                 <select
                   value={form.direction}
                   onChange={(e) => update("direction", e.target.value as TradeDirection)}
-                  className="h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                  className="h-11 w-full rounded-lg border border-input bg-background text-foreground px-2.5 text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
                 >
                   <option value="long">Long</option>
                   <option value="short">Short</option>

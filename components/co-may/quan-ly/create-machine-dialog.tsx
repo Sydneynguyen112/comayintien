@@ -295,7 +295,7 @@ export function CreateMachineDialog({
                 onChange={(v) => update("signalSource", v as SignalSource)}
               >
                 {SIGNAL_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <option key={o.value} value={o.value} className="bg-background text-foreground">
                     {o.label}
                   </option>
                 ))}
@@ -483,7 +483,7 @@ function NativeSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+      className="h-11 w-full rounded-lg border border-input bg-background text-foreground px-3 text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
     >
       {children}
     </select>
