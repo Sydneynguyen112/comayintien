@@ -98,8 +98,12 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
         </div>
       ) : (
         (() => {
-          const active = machineMap.filter(({ m }) => m.status !== "closed");
-          const closed = machineMap.filter(({ m }) => m.status === "closed");
+          // Mới tạo lên đầu. Sau hydrate cloud thứ tự theo DB nên phải sort lại
+          // (created_at là ISO string → so sánh chuỗi = so sánh thời gian).
+          const byNewest = (a: { m: Machine }, b: { m: Machine }) =>
+            b.m.created_at.localeCompare(a.m.created_at);
+          const active = machineMap.filter(({ m }) => m.status !== "closed").sort(byNewest);
+          const closed = machineMap.filter(({ m }) => m.status === "closed").sort(byNewest);
           const reportByMachineId = new Map<string, CycleReport>();
           for (const r of reports) {
             const prev = reportByMachineId.get(r.machine_id);
