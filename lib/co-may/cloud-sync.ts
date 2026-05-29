@@ -162,7 +162,10 @@ function machineToRow(m: Machine, userId: string): Partial<MachineRow> {
     current_anchor: m.current_anchor,
     cycle_started_at: m.cycle_started_at,
     status: m.status,
-    currency_unit: m.currency_unit ?? null,
+    // Cot currency_unit la NOT NULL DEFAULT 'USD' (xem supabase-comay-currency-unit.sql).
+    // Gui null cho may USD (currency_unit undefined) -> vi pham NOT NULL -> upsert
+    // that bai am tham -> may khong luu len cloud -> reload la mat. Mac dinh 'USD'.
+    currency_unit: m.currency_unit ?? "USD",
     method: m.method ?? null,
     signal_source: m.signal_source ?? null,
     risk_per_trade_pct: m.risk_per_trade_pct ?? null,
