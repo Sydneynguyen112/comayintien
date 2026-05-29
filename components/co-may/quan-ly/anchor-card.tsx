@@ -7,13 +7,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { recordTransaction, updateMachine } from "@/lib/co-may/mock-data";
 import type { Machine } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 import { isSeniorMode, seniorCx } from "@/lib/co-may/senior-ui";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 export function AnchorCard({
   machine,
@@ -29,6 +24,7 @@ export function AnchorCard({
   role?: string | null;
 }) {
   const senior = isSeniorMode(role);
+  const fmt = (n: number) => formatMoney(n, machine.currency_unit);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(machine.current_anchor));
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +36,7 @@ export function AnchorCard({
     }
     if (newAnchor >= machine.current_anchor) {
       // Kỷ luật: anchor monotonic-decrease (chỉ tăng tự động qua closeCycle scale)
-      return setError(`Anchor mới phải < ${usd.format(machine.current_anchor)}`);
+      return setError(`Anchor mới phải < ${fmt(machine.current_anchor)}`);
     }
     setError(null);
     const delta = newAnchor - machine.current_anchor;
@@ -48,7 +44,7 @@ export function AnchorCard({
     recordTransaction(ownerId, machine.id, {
       type: "anchor_change",
       amount: delta,
-      note: `Hạ neo từ ${usd.format(machine.current_anchor)} xuống ${usd.format(newAnchor)}`,
+      note: `Hạ neo từ ${fmt(machine.current_anchor)} xuống ${fmt(newAnchor)}`,
     });
     setEditing(false);
     setDraft(String(newAnchor));
@@ -73,7 +69,7 @@ export function AnchorCard({
           senior ? "text-5xl md:text-6xl" : "text-4xl md:text-5xl",
         )}
       >
-        {usd.format(machine.current_anchor)}
+        {fmt(machine.current_anchor)}
       </div>
 
       {senior ? (

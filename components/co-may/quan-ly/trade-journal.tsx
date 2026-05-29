@@ -14,19 +14,15 @@ import {
 } from "@/components/ui/dialog";
 import { cn, formatDate } from "@/lib/utils";
 import { recordTransaction } from "@/lib/co-may/mock-data";
-import type { MachineTransaction, TradeDirection } from "@/lib/co-may/types";
+import type { CurrencyUnit, MachineTransaction, TradeDirection } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 import { SymbolCombobox } from "./symbol-combobox";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
 
 interface Props {
   ownerId: string;
   machineId: string;
   tx: MachineTransaction[];
+  unit?: CurrencyUnit;
   onChange: () => void;
   readOnly?: boolean;
 }
@@ -51,7 +47,8 @@ const INITIAL_FORM: TradeFormState = {
   emotion: "",
 };
 
-export function TradeJournal({ ownerId, machineId, tx, onChange, readOnly }: Props) {
+export function TradeJournal({ ownerId, machineId, tx, unit, onChange, readOnly }: Props) {
+  const fmt = (n: number) => formatMoney(n, unit);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<TradeFormState>(INITIAL_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +169,7 @@ export function TradeJournal({ ownerId, machineId, tx, onChange, readOnly }: Pro
                         )}
                       >
                         {t.amount > 0 ? "+" : ""}
-                        {usd.format(t.amount)}
+                        {fmt(t.amount)}
                       </span>
                     </Td>
                     <Td>{t.entry_reason ?? "—"}</Td>

@@ -1,18 +1,14 @@
 "use client";
 
-import type { MachineTransaction } from "@/lib/co-may/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import type { CurrencyUnit, MachineTransaction } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 
 interface Props {
   capital: number;
   /** Tx của machine, sorted ASC theo time. */
   tx: MachineTransaction[];
   milestones?: number[];
+  unit?: CurrencyUnit;
 }
 
 interface Point {
@@ -21,7 +17,8 @@ interface Point {
   amount?: number;
 }
 
-export function MachineEquityCurve({ capital, tx, milestones }: Props) {
+export function MachineEquityCurve({ capital, tx, milestones, unit }: Props) {
+  const fmt = (n: number) => formatMoney(n, unit);
   // Trades + withdraws (excluding anchor changes), chronological
   const events = [...tx]
     .filter((t) => t.type !== "anchor_change")
@@ -173,7 +170,7 @@ export function MachineEquityCurve({ capital, tx, milestones }: Props) {
                   key={`wd-html-${i}`}
                   className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-[#3B6C4F] dark:bg-[#5C9C75] text-white text-[10px] font-bold ring-2 ring-card pointer-events-none"
                   style={{ left: `${xPct}%`, top: `${yPct}%` }}
-                  title={`Rút ${usd.format(w.amount ?? 0)}`}
+                  title={`Rút ${fmt(w.amount ?? 0)}`}
                 >
                   $
                 </div>
@@ -197,7 +194,7 @@ export function MachineEquityCurve({ capital, tx, milestones }: Props) {
                   className="absolute right-0 -translate-y-1/2 text-sm font-bold text-foreground/80 tabular-nums tracking-tight text-right pl-2"
                   style={{ top: `${yPct}%`, minWidth: 76 }}
                 >
-                  {usd.format(m)}
+                  {fmt(m)}
                 </div>
               );
             })}

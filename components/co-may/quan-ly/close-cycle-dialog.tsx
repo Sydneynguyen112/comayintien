@@ -14,27 +14,26 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { closeCycleMock } from "@/lib/co-may/mock-data";
 import { isSeniorMode } from "@/lib/co-may/senior-ui";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from "@/lib/co-may/currency";
+import type { CurrencyUnit } from "@/lib/co-may/types";
 
 export function CloseCycleDialog({
   ownerId,
   machineId,
   cyclePnl,
+  unit,
   onChange,
   role,
 }: {
   ownerId: string;
   machineId: string;
   cyclePnl: number;
+  unit?: CurrencyUnit;
   onChange: () => void;
   role?: string | null;
 }) {
   const senior = isSeniorMode(role);
+  const fmt = (n: number) => formatMoney(n, unit);
   const [open, setOpen] = useState(false);
 
   function handle(decision: "reset" | "scale") {
@@ -68,7 +67,7 @@ export function CloseCycleDialog({
               }
             >
               {cyclePnl >= 0 ? "+" : ""}
-              {usd.format(cyclePnl)}
+              {fmt(cyclePnl)}
             </span>
             . Chọn quyết định cho chu kỳ tiếp theo.
           </DialogDescription>
@@ -109,7 +108,7 @@ export function CloseCycleDialog({
               <TrendingUp className={senior ? "h-5 w-5 text-primary" : "h-4 w-4 text-primary"} />
               <span className={cn("font-semibold text-foreground", senior && "text-lg")}>
                 Scale — Tăng vốn theo lợi nhuận{" "}
-                {cyclePnl > 0 && <span className="text-primary">(+{usd.format(cyclePnl)})</span>}
+                {cyclePnl > 0 && <span className="text-primary">(+{fmt(cyclePnl)})</span>}
               </span>
             </div>
             <p className={senior ? "text-sm text-muted-foreground leading-relaxed" : "text-xs text-muted-foreground"}>

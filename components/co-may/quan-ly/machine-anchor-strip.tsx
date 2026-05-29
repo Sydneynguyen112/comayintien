@@ -3,18 +3,16 @@
 import { useEffect, useState } from "react";
 import { Check, Pencil, Sparkles, Target, TrendingDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from "@/lib/co-may/currency";
+import type { CurrencyUnit } from "@/lib/co-may/types";
 
 interface Props {
   milestones: number[];
   /** Mốc neo hiện tại (machine.current_anchor) — user-chosen, có thể khác milestone exact. */
   currentAnchor: number;
   balance: number;
+  /** Đơn vị hiển thị của cỗ máy (USD mặc định / USC tài khoản cent). */
+  unit?: CurrencyUnit;
   /** Lưu mảng milestone mới sau khi user chỉnh. */
   onEditMilestones?: (next: number[]) => void;
   onEdit?: () => void;
@@ -37,6 +35,7 @@ export function MachineAnchorStrip({
   milestones,
   currentAnchor,
   balance,
+  unit,
   onEdit,
   onEditMilestones,
   onWithdraw,
@@ -47,6 +46,7 @@ export function MachineAnchorStrip({
   tradeCount,
   persistKey,
 }: Props) {
+  const fmt = (n: number) => formatMoney(n, unit);
   // Mỗi lệnh = 1 hành động. Sau khi user rút / hạ neo / giữ vốn → ẩn panel cho tới lệnh tiếp theo.
   // Persist tradeCount lúc dismiss vào localStorage để survive reload.
   const storageKey = persistKey ? `co-may-anchor-dismiss-${persistKey}` : null;
@@ -183,7 +183,7 @@ export function MachineAnchorStrip({
             <div className="text-base md:text-lg italic text-foreground leading-snug">
               Có thể hạ neo xuống{" "}
               <span className="font-bold not-italic tabular-nums">
-                {usd.format(canWithdrawToLower && nextLowerMilestone !== null ? nextLowerMilestone : balance)}
+                {fmt(canWithdrawToLower && nextLowerMilestone !== null ? nextLowerMilestone : balance)}
               </span>
             </div>
           </div>
@@ -204,7 +204,7 @@ export function MachineAnchorStrip({
           >
             <TrendingDown className="h-4 w-4" />
             Hạ neo xuống{" "}
-            {usd.format(
+            {fmt(
               canWithdrawToLower && nextLowerMilestone !== null ? nextLowerMilestone : balance,
             )}
           </button>
@@ -218,7 +218,7 @@ export function MachineAnchorStrip({
               Số dư hiện tại trên mốc neo
             </div>
             <div className="text-3xl md:text-4xl font-bold text-[#3B6C4F] dark:text-[#5C9C75] tabular-nums leading-none">
-              +{usd.format(overflowCurrent)}
+              +{fmt(overflowCurrent)}
             </div>
           </div>
 
@@ -231,7 +231,7 @@ export function MachineAnchorStrip({
                 className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white py-3 text-sm font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
               >
                 <Sparkles className="h-4 w-4" />
-                Rút {usd.format(overflowPrev)} về mốc {usd.format(prevMilestone)} · NÂNG NEO ↑
+                Rút {fmt(overflowPrev)} về mốc {fmt(prevMilestone)} · NÂNG NEO ↑
               </button>
               <button
                 type="button"
@@ -247,7 +247,7 @@ export function MachineAnchorStrip({
                 className="w-full rounded-xl border-2 border-dashed border-[#3B6C4F]/40 hover:border-[#3B6C4F]/70 hover:bg-[#3B6C4F]/8 py-3 text-sm font-bold uppercase tracking-widest text-[#3B6C4F] dark:text-[#5C9C75] transition-colors flex items-center justify-center gap-2"
               >
                 <Sparkles className="h-4 w-4" />
-                Rút {usd.format(overflowCurrent)} về mốc {usd.format(currentAnchor)}
+                Rút {fmt(overflowCurrent)} về mốc {fmt(currentAnchor)}
               </button>
             </>
           ) : prevMilestone === null ? (
@@ -258,7 +258,7 @@ export function MachineAnchorStrip({
               className="w-full rounded-xl bg-[#3B6C4F] hover:bg-[#2F5840] text-white py-3 text-sm font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
             >
               <Sparkles className="h-4 w-4" />
-              Rút {usd.format(overflowCurrent)} về mốc {usd.format(currentAnchor)}
+              Rút {fmt(overflowCurrent)} về mốc {fmt(currentAnchor)}
             </button>
           ) : (
             <>
@@ -277,7 +277,7 @@ export function MachineAnchorStrip({
                 className="w-full rounded-xl border-2 border-dashed border-[#3B6C4F]/40 hover:border-[#3B6C4F]/70 hover:bg-[#3B6C4F]/8 py-3 text-sm font-bold uppercase tracking-widest text-[#3B6C4F] dark:text-[#5C9C75] transition-colors flex items-center justify-center gap-2"
               >
                 <Sparkles className="h-4 w-4" />
-                Rút {usd.format(overflowCurrent)} về mốc {usd.format(currentAnchor)}
+                Rút {fmt(overflowCurrent)} về mốc {fmt(currentAnchor)}
               </button>
               <button
                 type="button"
@@ -288,7 +288,7 @@ export function MachineAnchorStrip({
                 className="w-full rounded-xl border-2 border-dashed border-border hover:border-foreground/40 hover:bg-muted/50 py-2 text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors"
               >
                 <Target className="h-3.5 w-3.5 inline mr-1.5" />
-                Giữ vốn — quay về mốc {usd.format(prevMilestone)}
+                Giữ vốn — quay về mốc {fmt(prevMilestone)}
               </button>
             </>
           )}
@@ -339,7 +339,7 @@ export function MachineAnchorStrip({
                 >
                   M{i + 1}
                 </div>
-                <div className="text-lg md:text-xl font-bold tabular-nums">{usd.format(m)}</div>
+                <div className="text-lg md:text-xl font-bold tabular-nums">{fmt(m)}</div>
                 <div className="text-[10px] uppercase tracking-widest mt-1 opacity-70 font-semibold">
                   {stateLabel}
                 </div>

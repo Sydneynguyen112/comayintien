@@ -227,6 +227,7 @@ export function addMachine(
     name: string;
     capital: number;
     current_anchor: number;
+    currency_unit?: Machine["currency_unit"];
     method?: string;
     signal_source?: Machine["signal_source"];
     risk_per_trade_pct?: number;
@@ -248,6 +249,7 @@ export function addMachine(
     status: "active",
     created_at: now,
     updated_at: now,
+    currency_unit: input.currency_unit,
     method: input.method,
     signal_source: input.signal_source,
     risk_per_trade_pct: input.risk_per_trade_pct,
@@ -473,6 +475,7 @@ export function finalizeCycle(
       status: "active",
       created_at: now,
       updated_at: now,
+      currency_unit: machine.currency_unit,
       method: machine.method,
       signal_source: machine.signal_source,
       risk_per_trade_pct: machine.risk_per_trade_pct,
@@ -490,6 +493,7 @@ export function finalizeCycle(
     user_id: userId,
     machine_name: machine.name,
     machine_method: machine.method,
+    currency_unit: machine.currency_unit,
     start_date: cycleStart,
     end_date: now,
     decision: input.decision,
@@ -546,6 +550,7 @@ export function closeCycleMock(
     id: nextId("rep-new"),
     machine_id: machineId,
     user_id: userId,
+    currency_unit: machine.currency_unit,
     start_date: cycleStart,
     end_date: newCycleStart,
     decision,

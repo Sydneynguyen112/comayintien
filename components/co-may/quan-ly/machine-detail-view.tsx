@@ -24,6 +24,7 @@ import {
 import { fireworksGrand, FIREWORK_GRAND_DURATION } from "@/lib/co-may/celebrate";
 import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 import { MachineAnchorStrip } from "./machine-anchor-strip";
 import { MachineBalanceBreakdown } from "./machine-balance-breakdown";
 import { MachineMt5Panel } from "./machine-mt5-panel";
@@ -31,12 +32,6 @@ import { MachineEquityCurve } from "./machine-equity-curve";
 import { TradeJournal } from "./trade-journal";
 import { WithdrawJournal } from "./withdraw-journal";
 import { WithdrawDialog } from "./withdraw-dialog";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 const DAY_MS = 86400_000;
 
@@ -126,6 +121,8 @@ export function MachineDetailView({
   }
 
   const { machine, tx, resolvedOwner } = resolved;
+  const unit = machine.currency_unit;
+  const fmt = (n: number) => formatMoney(n, unit);
   const cycleStartTs = new Date(machine.cycle_started_at ?? machine.created_at).getTime();
 
   const allTrades = tx.filter((t) => t.type === "trade_win" || t.type === "trade_loss");
@@ -170,7 +167,7 @@ export function MachineDetailView({
                         ? "border-foreground/30 bg-foreground/5 text-foreground"
                         : "border-border bg-muted/30 text-muted-foreground",
                   )}
-                  title={`PNL ${usd.format(totalPnl)} / Vốn ${usd.format(machine.capital)}`}
+                  title={`PNL ${fmt(totalPnl)} / Vốn ${fmt(machine.capital)}`}
                 >
                   <TrendingUp className={cn("h-3 w-3", totalPnl < 0 && "rotate-180")} />
                   {totalPnl > 0 ? "+" : ""}
@@ -203,15 +200,15 @@ export function MachineDetailView({
         <KpiTile
           dark
           label="Đã rút"
-          value={usd.format(withdrawnAbs)}
+          value={fmt(withdrawnAbs)}
           hint="Tiền thật về tài khoản"
           icon={Wallet}
         />
-        <KpiTile label="Số dư hiện tại" value={usd.format(balance)} icon={Coins} />
-        <KpiTile label="Vốn gốc" value={usd.format(machine.capital)} icon={Coins} />
+        <KpiTile label="Số dư hiện tại" value={fmt(balance)} icon={Coins} />
+        <KpiTile label="Vốn gốc" value={fmt(machine.capital)} icon={Coins} />
         <KpiTile
           label="PNL"
-          value={`${totalPnl >= 0 ? "+" : ""}${usd.format(totalPnl)}`}
+          value={`${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}`}
           hint={`${allTrades.length} lệnh · WR ${wr}%`}
           icon={TrendingUp}
           tone={totalPnl > 0 ? "profit" : totalPnl < 0 ? "loss" : "neutral"}
@@ -223,6 +220,7 @@ export function MachineDetailView({
         milestones={machine.anchor_milestones ?? []}
         currentAnchor={machine.current_anchor}
         balance={balance}
+        unit={unit}
         readOnly={readOnly}
         tradeCount={allTrades.length}
         persistKey={machineId}
@@ -236,13 +234,13 @@ export function MachineDetailView({
           recordTransaction(resolvedOwner, machineId, {
             type: "withdraw",
             amount: -amount,
-            note: `Rút ${usd.format(amount)} về mốc ${usd.format(toAnchor)}`,
+            note: `Rút ${fmt(amount)} về mốc ${fmt(toAnchor)}`,
           });
           // Tách hoạt động nâng neo thành tx riêng để filter "Hạ/Nâng neo" truy xuất được.
           recordTransaction(resolvedOwner, machineId, {
             type: "anchor_change",
             amount: toAnchor - fromAnchor,
-            note: `Nâng neo từ ${usd.format(fromAnchor)} lên ${usd.format(toAnchor)}`,
+            note: `Nâng neo từ ${fmt(fromAnchor)} lên ${fmt(toAnchor)}`,
           });
           updateMachine(resolvedOwner, machineId, { current_anchor: toAnchor });
           refresh();
@@ -260,7 +258,7 @@ export function MachineDetailView({
           recordTransaction(resolvedOwner, machineId, {
             type: "anchor_change",
             amount: newAnchor - oldAnchor,
-            note: `Hạ neo từ ${usd.format(oldAnchor)} xuống ${usd.format(newAnchor)}`,
+            note: `Hạ neo từ ${fmt(oldAnchor)} xuống ${fmt(newAnchor)}`,
           });
           refresh();
         }}
@@ -281,12 +279,14 @@ export function MachineDetailView({
             capital={machine.capital}
             tx={tx}
             milestones={machine.anchor_milestones}
+            unit={unit}
           />
         </div>
         <MachineBalanceBreakdown
           capital={machine.capital}
           totalPnl={totalPnl}
           totalWithdrawn={withdrawnAbs}
+          unit={unit}
         />
       </div>
 
@@ -304,12 +304,13 @@ export function MachineDetailView({
         ownerId={resolvedOwner}
         machineId={machineId}
         tx={tx}
+        unit={unit}
         onChange={refresh}
         readOnly={readOnly}
       />
 
       {/* Withdraw journal */}
-      <WithdrawJournal tx={tx} />
+      <WithdrawJournal tx={tx} unit={unit} />
 
       {/* Shared withdraw dialog (with fireworks) */}
       <WithdrawDialog
@@ -319,6 +320,7 @@ export function MachineDetailView({
         machineId={machineId}
         presetAmount={withdrawPreset.amount}
         currentAnchor={withdrawPreset.anchor || machine.current_anchor}
+        unit={unit}
         onSuccess={refresh}
       />
 
@@ -342,11 +344,11 @@ export function MachineDetailView({
               <p className="text-base md:text-lg text-foreground/85">
                 Để dành{" "}
                 <span className="font-bold text-[#3B6C4F] dark:text-[#5C9C75] tabular-nums">
-                  {usd.format(holdCelebrate.overflow)}
+                  {fmt(holdCelebrate.overflow)}
                 </span>{" "}
                 — nhắm mốc{" "}
                 <span className="font-bold text-primary tabular-nums">
-                  {usd.format(holdCelebrate.target)}
+                  {fmt(holdCelebrate.target)}
                 </span>
               </p>
               <div className="border-t border-dashed border-border pt-3">
@@ -379,17 +381,17 @@ export function MachineDetailView({
               </h3>
               <div className="flex items-center justify-center gap-3 text-2xl md:text-3xl font-bold tabular-nums">
                 <span className="text-muted-foreground/60 line-through">
-                  {usd.format(liftCelebrate.fromAnchor)}
+                  {fmt(liftCelebrate.fromAnchor)}
                 </span>
                 <ArrowUpRight className="h-6 w-6 text-primary" />
                 <span className="text-primary gold-gradient-text">
-                  {usd.format(liftCelebrate.toAnchor)}
+                  {fmt(liftCelebrate.toAnchor)}
                 </span>
               </div>
               <p className="text-base text-muted-foreground">
                 Đã rút{" "}
                 <strong className="text-[#3B6C4F] dark:text-[#5C9C75]">
-                  {usd.format(liftCelebrate.amount)}
+                  {fmt(liftCelebrate.amount)}
                 </strong>{" "}
                 — phần lãi này không thể mất nữa.
               </p>

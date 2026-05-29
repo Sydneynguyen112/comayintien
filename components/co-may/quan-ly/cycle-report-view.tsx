@@ -7,13 +7,8 @@ import { useCurrentUser } from "@/lib/auth";
 import { getReportById, getUserScope } from "@/lib/co-may/mock-data";
 import { cn } from "@/lib/utils";
 import type { CycleReport } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 import { Button } from "@/components/ui/button";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 const DAY_MS = 86400_000;
 
@@ -65,6 +60,7 @@ export function CycleReportView({
   }
 
   const { r, resolvedOwner } = report;
+  const fmt = (n: number) => formatMoney(n, r.currency_unit);
   const days = Math.max(
     1,
     Math.floor((new Date(r.end_date).getTime() - new Date(r.start_date).getTime()) / DAY_MS),
@@ -116,9 +112,9 @@ export function CycleReportView({
       {/* KPI grid 4x2 */}
       <div className="rounded-2xl border-2 border-border overflow-hidden">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
-          <Tile label="Vốn đầu" value={usd.format(startCap)} />
-          <Tile label="Vốn cuối" value={usd.format(r.ending_balance ?? 0)} />
-          <Tile label="Đã rút" value={usd.format(r.withdrawn ?? 0)} />
+          <Tile label="Vốn đầu" value={fmt(startCap)} />
+          <Tile label="Vốn cuối" value={fmt(r.ending_balance ?? 0)} />
+          <Tile label="Đã rút" value={fmt(r.withdrawn ?? 0)} />
           <Tile
             dark
             label="Tăng trưởng"
@@ -130,7 +126,7 @@ export function CycleReportView({
           <Tile label="R:R" value={rrAvg > 0 ? rrAvg.toFixed(2) : "—"} />
           <Tile
             label="Max drawdown"
-            value={`${(r.max_drawdown ?? 0) <= 0 ? "" : "+"}${usd.format(r.max_drawdown ?? 0)} (${ddPct.toFixed(1)}%)`}
+            value={`${(r.max_drawdown ?? 0) <= 0 ? "" : "+"}${fmt(r.max_drawdown ?? 0)} (${ddPct.toFixed(1)}%)`}
           />
         </div>
       </div>

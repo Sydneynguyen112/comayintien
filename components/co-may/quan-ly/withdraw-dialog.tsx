@@ -13,22 +13,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { recordTransaction } from "@/lib/co-may/mock-data";
 import { fireworks, FIREWORK_DURATION } from "@/lib/co-may/celebrate";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import {
+  formatMoney,
+  toDisplay,
+  toUSD,
+  UNIT_SYMBOL,
+  resolveUnit,
+} from "@/lib/co-may/currency";
+import type { CurrencyUnit } from "@/lib/co-may/types";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   ownerId: string;
   machineId: string;
-  /** Amount preset (vd: balance - currentAnchor). User có thể edit trong note nếu muốn. */
+  /** Amount preset theo USD (vd: balance - currentAnchor). */
   presetAmount: number;
-  /** Mốc neo hiện tại — hiển thị "về mốc $X". */
+  /** Mốc neo hiện tại (USD) — hiển thị "về mốc X". */
   currentAnchor: number;
+  /** Đơn vị hiển thị của cỗ máy (USD / USC). */
+  unit?: CurrencyUnit;
   onSuccess: () => void;
 }
 
@@ -39,9 +43,13 @@ export function WithdrawDialog({
   machineId,
   presetAmount,
   currentAnchor,
+  unit,
   onSuccess,
 }: Props) {
-  const [amount, setAmount] = useState(presetAmount);
+  const fmt = (n: number) => formatMoney(n, unit);
+  const symbol = UNIT_SYMBOL[resolveUnit(unit)];
+  // `amount` lưu THEO đơn vị hiển thị; quy về USD khi ghi nhận.
+  const [amount, setAmount] = useState(toDisplay(presetAmount, unit));
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [celebrating, setCelebrating] = useState<{ amount: number; anchor: number } | null>(null);
@@ -49,8 +57,8 @@ export function WithdrawDialog({
 
   // Reset amount khi dialog mở lại với preset mới
   useEffect(() => {
-    if (open) setAmount(presetAmount);
-  }, [open, presetAmount]);
+    if (open) setAmount(toDisplay(presetAmount, unit));
+  }, [open, presetAmount, unit]);
 
   useEffect(() => {
     return () => {
@@ -61,12 +69,13 @@ export function WithdrawDialog({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting || amount <= 0) return;
+    const amountUSD = toUSD(amount, unit);
     setSubmitting(true);
     try {
       recordTransaction(ownerId, machineId, {
         type: "withdraw",
-        amount: -amount,
-        note: note.trim() || `Rút ${usd.format(amount)} về mốc ${usd.format(currentAnchor)}`,
+        amount: -amountUSD,
+        note: note.trim() || `Rút ${fmt(amountUSD)} về mốc ${fmt(currentAnchor)}`,
       });
     } catch (err) {
       setSubmitting(false);
@@ -77,7 +86,7 @@ export function WithdrawDialog({
     onOpenChange(false);
     setNote("");
     onSuccess();
-    setCelebrating({ amount, anchor: currentAnchor });
+    setCelebrating({ amount: amountUSD, anchor: currentAnchor });
     fireworks();
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -100,7 +109,7 @@ export function WithdrawDialog({
               Số tiền rút
             </div>
             <div className="flex items-center justify-center gap-1 text-4xl md:text-5xl font-bold text-[#3B6C4F] dark:text-[#5C9C75] tabular-nums leading-none">
-              <span>$</span>
+              <span>{symbol}</span>
               <input
                 type="number"
                 min={0}
@@ -111,7 +120,7 @@ export function WithdrawDialog({
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              về mốc <strong className="text-foreground">{usd.format(currentAnchor)}</strong>
+              về mốc <strong className="text-foreground">{fmt(currentAnchor)}</strong>
             </div>
           </div>
 
@@ -160,10 +169,10 @@ export function WithdrawDialog({
                 Chúc mừng
               </div>
               <h3 className="text-3xl md:text-4xl font-bold text-foreground">
-                Đã rút <span className="text-[#3B6C4F] dark:text-[#5C9C75]">{usd.format(celebrating.amount)}</span>
+                Đã rút <span className="text-[#3B6C4F] dark:text-[#5C9C75]">{fmt(celebrating.amount)}</span>
               </h3>
               <p className="text-sm text-muted-foreground">
-                về mốc <strong className="text-foreground">{usd.format(celebrating.anchor)}</strong>
+                về mốc <strong className="text-foreground">{fmt(celebrating.anchor)}</strong>
               </p>
               <div className="border-t border-dashed border-border pt-3">
                 <p className="text-sm md:text-base text-foreground/80 italic">

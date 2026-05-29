@@ -1,18 +1,15 @@
 "use client";
 
-import type { MachineTransaction } from "@/lib/co-may/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
+import type { CurrencyUnit, MachineTransaction } from "@/lib/co-may/types";
+import { formatMoney } from "@/lib/co-may/currency";
 
 interface Props {
   tx: MachineTransaction[];
+  unit?: CurrencyUnit;
 }
 
-export function WithdrawJournal({ tx }: Props) {
+export function WithdrawJournal({ tx, unit }: Props) {
+  const fmt = (n: number) => formatMoney(n, unit);
   const withdraws = tx
     .filter((t) => t.type === "withdraw")
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -22,7 +19,7 @@ export function WithdrawJournal({ tx }: Props) {
       <header className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <h3 className="text-lg md:text-xl font-bold text-foreground">Nhật ký rút tiền</h3>
         <span className="text-xs uppercase tracking-widest text-muted-foreground tabular-nums">
-          {withdraws.length} lần · {usd.format(withdraws.reduce((s, w) => s + -w.amount, 0))}
+          {withdraws.length} lần · {fmt(withdraws.reduce((s, w) => s + -w.amount, 0))}
         </span>
       </header>
 
@@ -39,7 +36,7 @@ export function WithdrawJournal({ tx }: Props) {
             >
               <div className="min-w-0">
                 <div className="font-bold text-foreground tabular-nums text-base">
-                  {usd.format(-w.amount)}
+                  {fmt(-w.amount)}
                 </div>
                 {w.note && (
                   <div className="text-sm italic text-muted-foreground/80 mt-0.5 truncate">

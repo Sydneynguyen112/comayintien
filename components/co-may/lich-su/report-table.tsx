@@ -4,13 +4,8 @@ import { Download, RotateCcw, TrendingUp } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import type { CycleReport, Machine, MachineTransaction } from "@/lib/co-may/types";
 import { isSeniorMode } from "@/lib/co-may/senior-ui";
+import { formatMoney } from "@/lib/co-may/currency";
 import { downloadCsv } from "./csv-export";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 export function ReportTable({
   reports,
@@ -112,10 +107,10 @@ export function ReportTable({
                   )}
                 >
                   {r.pnl > 0 ? "+" : ""}
-                  {usd.format(r.pnl)}
+                  {formatMoney(r.pnl, r.currency_unit)}
                 </td>
                 <td className={cn("px-4 text-right tabular-nums text-foreground whitespace-nowrap", cellY)}>
-                  {usd.format(r.withdrawn)}
+                  {formatMoney(r.withdrawn, r.currency_unit)}
                 </td>
                 <td className={cn("px-4 text-right", cellY)}>
                   <button

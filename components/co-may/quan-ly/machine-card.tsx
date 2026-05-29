@@ -4,12 +4,7 @@ import Link from "next/link";
 import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from "@/lib/co-may/currency";
 
 const DAY_MS = 86400_000;
 
@@ -29,6 +24,7 @@ export function MachineCard({
   detailHref: string;
   role?: string | null;
 }) {
+  const fmt = (n: number) => formatMoney(n, machine.currency_unit);
   const cycleStart = new Date(machine.cycle_started_at ?? machine.created_at).getTime();
   const trades = tx.filter((t) => t.type === "trade_win" || t.type === "trade_loss");
   const pnl = trades.reduce((s, t) => s + t.amount, 0);
@@ -109,14 +105,14 @@ export function MachineCard({
 
       {/* Stats */}
       <div className="border-t border-dashed border-border pt-3 space-y-1.5 text-sm">
-        <Row label="Vốn gốc" value={usd.format(machine.capital)} />
+        <Row label="Vốn gốc" value={fmt(machine.capital)} />
         <Row
           label="PNL"
-          value={`${pnl >= 0 ? "+" : ""}${usd.format(pnl)}`}
+          value={`${pnl >= 0 ? "+" : ""}${fmt(pnl)}`}
           tone={pnl > 0 ? "profit" : pnl < 0 ? "loss" : undefined}
         />
-        <Row label="Đã rút" value={usd.format(withdrawnAbs)} tone="gold" />
-        <Row label="Số dư hiện tại" value={usd.format(balance)} />
+        <Row label="Đã rút" value={fmt(withdrawnAbs)} tone="gold" />
+        <Row label="Số dư hiện tại" value={fmt(balance)} />
       </div>
 
       {/* Mốc neo strip */}
@@ -125,8 +121,8 @@ export function MachineCard({
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
             <span>Mốc neo</span>
             <span className="tabular-nums">
-              Hiện tại: <strong className="text-foreground">{usd.format(machine.current_anchor)}</strong>{" "}
-              · Số dư: <strong className="text-foreground">{usd.format(balance)}</strong>
+              Hiện tại: <strong className="text-foreground">{fmt(machine.current_anchor)}</strong>{" "}
+              · Số dư: <strong className="text-foreground">{fmt(balance)}</strong>
             </span>
           </div>
           <div className="relative h-2 mx-6">
@@ -163,7 +159,7 @@ export function MachineCard({
                   )}
                   style={{ left: `${pct}%` }}
                 >
-                  {usd.format(m)}
+                  {fmt(m)}
                 </span>
               );
             })}
@@ -177,10 +173,10 @@ export function MachineCard({
           <p className="text-sm leading-relaxed">
             PnL đang{" "}
             <span className="font-bold text-[#3B6C4F] dark:text-[#5C9C75] tabular-nums">
-              +{usd.format(overflow)}
+              +{fmt(overflow)}
             </span>
             , vượt mốc neo{" "}
-            <span className="font-bold tabular-nums">{usd.format(machine.current_anchor)}</span>
+            <span className="font-bold tabular-nums">{fmt(machine.current_anchor)}</span>
             . Rút ngay để giữ kỷ luật.
           </p>
         </div>
@@ -191,10 +187,10 @@ export function MachineCard({
           <TrendingDown className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p className="text-sm leading-relaxed">
             Số dư{" "}
-            <span className="font-bold tabular-nums">{usd.format(balance)}</span>{" "}
+            <span className="font-bold tabular-nums">{fmt(balance)}</span>{" "}
             đang dưới mốc neo{" "}
             <span className="font-bold text-primary tabular-nums">
-              {usd.format(machine.current_anchor)}
+              {fmt(machine.current_anchor)}
             </span>
             . Vào cỗ máy để hạ neo hoặc giữ vốn.
           </p>

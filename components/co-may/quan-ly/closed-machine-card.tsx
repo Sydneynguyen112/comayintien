@@ -3,12 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { CycleReport } from "@/lib/co-may/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from "@/lib/co-may/currency";
 
 const DECISION_LABEL: Record<string, string> = {
   scale: "SCALE",
@@ -23,6 +18,7 @@ export function ClosedMachineCard({
   report: CycleReport;
   detailHref: string;
 }) {
+  const fmt = (n: number) => formatMoney(n, report.currency_unit);
   const startCap = report.starting_capital ?? 0;
   const ending = report.ending_balance ?? 0;
   const trades = report.trade_count ?? 0;
@@ -45,9 +41,9 @@ export function ClosedMachineCard({
       </div>
 
       <div className="border-t border-dashed border-border pt-3 grid grid-cols-3 gap-3">
-        <Cell label="Vốn đầu" value={usd.format(startCap)} />
-        <Cell label="Vốn cuối" value={usd.format(ending)} />
-        <Cell label="Đã rút" value={usd.format(report.withdrawn ?? 0)} />
+        <Cell label="Vốn đầu" value={fmt(startCap)} />
+        <Cell label="Vốn cuối" value={fmt(ending)} />
+        <Cell label="Đã rút" value={fmt(report.withdrawn ?? 0)} />
       </div>
 
       <div className="border-t border-dashed border-border pt-3 flex items-center justify-between gap-2 flex-wrap">

@@ -13,6 +13,10 @@ export type CycleDecision = "reset" | "scale" | "close";
 
 export type SignalSource = "self" | "imported" | "both";
 
+// Đơn vị hiển thị của 1 cỗ máy. Số liệu LUÔN lưu canonical theo USD;
+// USC chỉ là đơn vị hiển thị (tài khoản cent: 1 USD = 100 USC).
+export type CurrencyUnit = "USD" | "USC";
+
 export interface Machine {
   id: string;
   user_id: string;
@@ -24,6 +28,8 @@ export interface Machine {
   created_at: string;
   updated_at: string;
   // ── Cấu hình mở rộng (optional cho machines tạo từ wizard quick-allocate) ──
+  // Đơn vị hiển thị; mặc định/undefined = "USD". Không đổi cách lưu trữ.
+  currency_unit?: CurrencyUnit;
   method?: string;
   signal_source?: SignalSource;
   risk_per_trade_pct?: number;
@@ -71,6 +77,7 @@ export interface CycleReport {
   user_id: string;
   machine_name?: string;
   machine_method?: string;
+  currency_unit?: CurrencyUnit;
   start_date: string;
   end_date: string;
   decision: CycleDecision;

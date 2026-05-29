@@ -23,6 +23,7 @@ interface MachineRow {
   current_anchor: number;
   cycle_started_at: string | null;
   status: string;
+  currency_unit: string | null;
   method: string | null;
   signal_source: string | null;
   risk_per_trade_pct: number | null;
@@ -56,6 +57,7 @@ interface ReportRow {
   user_id: string;
   machine_name: string | null;
   machine_method: string | null;
+  currency_unit: string | null;
   start_date: string;
   end_date: string;
   decision: string;
@@ -93,6 +95,7 @@ function toMachine(r: MachineRow): Machine {
     current_anchor: r.current_anchor,
     cycle_started_at: r.cycle_started_at,
     status: r.status as Machine["status"],
+    currency_unit: (r.currency_unit ?? undefined) as Machine["currency_unit"],
     method: r.method ?? undefined,
     signal_source: r.signal_source as Machine["signal_source"] | undefined,
     risk_per_trade_pct: r.risk_per_trade_pct ?? undefined,
@@ -130,6 +133,7 @@ function toReport(r: ReportRow): CycleReport {
     user_id: r.user_id,
     machine_name: r.machine_name ?? undefined,
     machine_method: r.machine_method ?? undefined,
+    currency_unit: (r.currency_unit ?? undefined) as CycleReport["currency_unit"],
     start_date: r.start_date,
     end_date: r.end_date,
     decision: r.decision as CycleReport["decision"],
@@ -158,6 +162,7 @@ function machineToRow(m: Machine, userId: string): Partial<MachineRow> {
     current_anchor: m.current_anchor,
     cycle_started_at: m.cycle_started_at,
     status: m.status,
+    currency_unit: m.currency_unit ?? null,
     method: m.method ?? null,
     signal_source: m.signal_source ?? null,
     risk_per_trade_pct: m.risk_per_trade_pct ?? null,
@@ -195,6 +200,7 @@ function reportToRow(r: CycleReport, userId: string): Partial<ReportRow> {
     user_id: userId,
     machine_name: r.machine_name ?? null,
     machine_method: r.machine_method ?? null,
+    currency_unit: r.currency_unit ?? null,
     start_date: r.start_date,
     end_date: r.end_date,
     decision: r.decision,

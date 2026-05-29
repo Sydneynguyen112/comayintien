@@ -15,13 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { addMachine } from "@/lib/co-may/mock-data";
-import type { SignalSource } from "@/lib/co-may/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import type { CurrencyUnit, SignalSource } from "@/lib/co-may/types";
+import { formatMoney, toUSD, USC_PER_USD } from "@/lib/co-may/currency";
 
 const SIGNAL_OPTIONS: { value: SignalSource; label: string }[] = [
   { value: "self", label: "Tự sản xuất" },
@@ -29,10 +24,16 @@ const SIGNAL_OPTIONS: { value: SignalSource; label: string }[] = [
   { value: "both", label: "Cả hai" },
 ];
 
+const UNIT_OPTIONS: { value: CurrencyUnit; label: string }[] = [
+  { value: "USD", label: "USD ($) · Tài khoản thường" },
+  { value: "USC", label: "USC (¢) · Tài khoản cent" },
+];
+
 interface FormState {
   name: string;
   method: string;
   capital: string;
+  unit: CurrencyUnit;
   signalSource: SignalSource;
   riskPerTrade: string;
   maxDd: string;
@@ -45,6 +46,7 @@ const INITIAL: FormState = {
   name: "",
   method: "",
   capital: "",
+  unit: "USD",
   signalSource: "self",
   riskPerTrade: "2",
   maxDd: "30",
@@ -86,20 +88,44 @@ export function CreateMachineDialog({
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
 
+  const unit = form.unit;
+  // capitalNum = số người dùng nhập, THEO đơn vị đang chọn (USD hoặc USC).
   const capitalNum = Number(form.capital) || 0;
+  const capitalUSD = toUSD(capitalNum, unit); // canonical để lưu + đối chiếu reserve
 
   // Auto-generate anchors khi capital thay đổi (chỉ nếu user chưa custom).
+  // Anchors giữ theo đơn vị hiển thị; quy về USD lúc submit.
   const [anchorsDirty, setAnchorsDirty] = useState(false);
   useEffect(() => {
     if (anchorsDirty) return;
     setForm((f) => ({ ...f, anchors: generateAnchors(capitalNum) }));
   }, [capitalNum, anchorsDirty]);
 
+  // reservePool luôn là USD; hiển thị theo đơn vị đang chọn.
   const reserveHint = useMemo(() => {
     if (reservePool === undefined) return null;
-    const remaining = reservePool - capitalNum;
-    return { reserve: reservePool, remaining };
-  }, [reservePool, capitalNum]);
+    return { reserveUSD: reservePool };
+  }, [reservePool]);
+
+  // Đổi đơn vị: quy đổi các ô tiền để GIỮ NGUYÊN giá trị USD tương đương.
+  function changeUnit(next: CurrencyUnit) {
+    setForm((f) => {
+      if (f.unit === next) return f;
+      const factor = next === "USC" ? USC_PER_USD : 1 / USC_PER_USD;
+      const scale = (s: string) => {
+        const n = Number(s);
+        if (!s || !Number.isFinite(n) || n === 0) return s;
+        return String(Math.round(n * factor * 100) / 100);
+      };
+      return {
+        ...f,
+        unit: next,
+        capital: scale(f.capital),
+        targetProfit: scale(f.targetProfit),
+        anchors: f.anchors.map((a) => Math.max(1, Math.round(a * factor))),
+      };
+    });
+  }
 
   function reset() {
     setForm(INITIAL);
@@ -137,22 +163,28 @@ export function CreateMachineDialog({
     if (!form.name.trim()) return setError("Tên cỗ máy không được để trống");
     if (!Number.isFinite(capitalNum) || capitalNum <= 0)
       return setError("Vốn phải > 0");
-    if (reservePool !== undefined && capitalNum > reservePool)
+    if (reservePool !== undefined && capitalUSD > reservePool)
       return setError(
-        `Vốn (${usd.format(capitalNum)}) vượt vốn dự trữ khả dụng (${usd.format(reservePool)})`,
+        `Vốn (${formatMoney(capitalUSD, unit)}) vượt vốn dự trữ khả dụng (${formatMoney(reservePool, unit)})`,
       );
 
     addMachine(userId, {
       name: form.name.trim(),
-      capital: capitalNum,
-      current_anchor: capitalNum, // Anchor khởi đầu = vốn ban đầu
+      capital: capitalUSD,
+      current_anchor: capitalUSD, // Anchor khởi đầu = vốn ban đầu (USD)
+      currency_unit: unit === "USC" ? "USC" : undefined,
       method: form.method.trim() || undefined,
       signal_source: form.signalSource,
       risk_per_trade_pct: Number(form.riskPerTrade) || undefined,
       max_drawdown_pct: Number(form.maxDd) || undefined,
       target_withdraw_count: Number(form.targetWithdrawCount) || undefined,
-      target_profit: Number(form.targetProfit) || undefined,
-      anchor_milestones: form.anchors.length > 0 ? form.anchors : undefined,
+      target_profit: Number(form.targetProfit)
+        ? toUSD(Number(form.targetProfit), unit)
+        : undefined,
+      anchor_milestones:
+        form.anchors.length > 0
+          ? form.anchors.map((a) => toUSD(a, unit))
+          : undefined,
     });
     reset();
     setOpen(false);
@@ -208,13 +240,37 @@ export function CreateMachineDialog({
             />
           </Field>
 
+          {/* Đơn vị tiền tệ */}
+          <Field
+            label="Đơn vị tiền tệ"
+            hint="Tài khoản cent hiển thị bằng USC. 1 USD = 100 USC — vốn vẫn lưu & đối chiếu dự trữ theo USD."
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {UNIT_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => changeUnit(o.value)}
+                  className={cn(
+                    "h-11 rounded-lg border-2 px-3 text-sm font-semibold transition-colors",
+                    unit === o.value
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           {/* Vốn + Nguồn tín hiệu */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field
-              label="Vốn ($)"
+              label={`Vốn (${unit === "USC" ? "USC ¢" : "$"})`}
               hint={
                 reserveHint
-                  ? `Reserve: ${usd.format(reserveHint.reserve)}`
+                  ? `Dự trữ khả dụng: ${formatMoney(reserveHint.reserveUSD, unit)}`
                   : undefined
               }
             >
@@ -222,11 +278,16 @@ export function CreateMachineDialog({
                 type="number"
                 value={form.capital}
                 onChange={(e) => update("capital", e.target.value)}
-                placeholder="200"
+                placeholder={unit === "USC" ? "20000" : "200"}
                 min={1}
                 step="1"
                 className="h-11 text-base"
               />
+              {unit === "USC" && capitalNum > 0 && (
+                <p className="text-xs italic text-muted-foreground/80">
+                  = {formatMoney(capitalUSD, "USD")} · lưu theo USD
+                </p>
+              )}
             </Field>
             <Field label="Nguồn tín hiệu">
               <NativeSelect
@@ -290,7 +351,7 @@ export function CreateMachineDialog({
               </Field>
               <Field
                 label=""
-                hint="Tổng lợi nhuận mục tiêu ($)"
+                hint={`Tổng lợi nhuận mục tiêu (${unit === "USC" ? "USC ¢" : "$"})`}
               >
                 <Input
                   type="number"
@@ -308,7 +369,7 @@ export function CreateMachineDialog({
           {/* Mốc neo */}
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Mốc neo — tự động sinh, có thể chỉnh tay
+              Mốc neo ({unit === "USC" ? "USC ¢" : "$"}) — tự động sinh, có thể chỉnh tay
             </h3>
             <div className="rounded-xl border-2 border-dashed border-border bg-card/50 p-3 space-y-2">
               {form.anchors.length === 0 && (

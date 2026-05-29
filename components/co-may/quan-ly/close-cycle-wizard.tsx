@@ -22,12 +22,7 @@ import type {
   MachineTransaction,
 } from "@/lib/co-may/types";
 import { Button } from "@/components/ui/button";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatMoney } from "@/lib/co-may/currency";
 
 const STEPS = [
   { idx: 1, label: "Tổng kết" },
@@ -126,6 +121,7 @@ export function CloseCycleWizard({
   }
 
   const { machine, tx, resolvedOwner } = resolved;
+  const fmt = (n: number) => formatMoney(n, machine.currency_unit);
 
   // Stats chu kỳ hiện tại
   const cycleStartTs = new Date(machine.cycle_started_at ?? machine.created_at).getTime();
@@ -265,14 +261,14 @@ export function CloseCycleWizard({
               <p className="text-sm text-muted-foreground mt-1">Đây là toàn cảnh chu kỳ.</p>
             </div>
             <div className="border border-border rounded-xl p-4 md:p-6 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5">
-              <Stat label="Vốn" value={usd.format(machine.capital)} />
+              <Stat label="Vốn" value={fmt(machine.capital)} />
               <Stat
                 label="PnL cuối"
-                value={`${pnl >= 0 ? "+" : ""}${usd.format(pnl)}`}
+                value={`${pnl >= 0 ? "+" : ""}${fmt(pnl)}`}
                 tone={pnl > 0 ? "profit" : pnl < 0 ? "loss" : undefined}
               />
-              <Stat label="Peak PnL" value={`+${usd.format(peakPnl)}`} />
-              <Stat label="Đã rút" value={usd.format(withdrawn)} tone="gold" />
+              <Stat label="Peak PnL" value={`+${fmt(peakPnl)}`} />
+              <Stat label="Đã rút" value={fmt(withdrawn)} tone="gold" />
               <Stat label="Lệnh" value={String(trades.length)} />
               <Stat label="Winrate" value={`${wr}%`} />
               <Stat label="R:R" value={rrAvg.toFixed(2)} />
@@ -425,7 +421,7 @@ export function CloseCycleWizard({
                     </h4>
                     <span className="text-[11px] text-muted-foreground tabular-nums">
                       Khả dụng:{" "}
-                      <strong className="text-foreground">{usd.format(scaleBudget)}</strong>
+                      <strong className="text-foreground">{fmt(scaleBudget)}</strong>
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
@@ -472,7 +468,7 @@ export function CloseCycleWizard({
                       <div className="text-xs text-muted-foreground tabular-nums">
                         Vốn mới ={" "}
                         <strong className="text-foreground">
-                          {usd.format(computedScaleCapital)}
+                          {fmt(computedScaleCapital)}
                         </strong>
                       </div>
                     </div>
@@ -489,7 +485,7 @@ export function CloseCycleWizard({
                       <div className="text-xs text-muted-foreground tabular-nums">
                         Vốn mới ={" "}
                         <strong className="text-foreground">
-                          {usd.format(computedScaleCapital)}
+                          {fmt(computedScaleCapital)}
                         </strong>
                       </div>
                     </div>
