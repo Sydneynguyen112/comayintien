@@ -41,7 +41,12 @@ export default function ClientCoMayLayout({
     return () => {
       cancelled = true;
     };
-  }, [user, router]);
+    // Chỉ hydrate 1 lần cho mỗi userId. useCurrentUser trả object user MỚI mỗi
+    // khi auth state đổi (token refresh, onAuthStateChange) — nếu dep theo `user`
+    // thì hydrate chạy lại, ghi đè localStorage bằng snapshot cloud cũ và "nuốt"
+    // cỗ máy vừa tạo (cloud upsert fire-and-forget chưa kịp landing).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, router]);
 
   if (!user || hydrated !== user.id) {
     return (

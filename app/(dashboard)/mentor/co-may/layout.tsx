@@ -39,7 +39,10 @@ export default function MentorCoMayLayout({
     return () => {
       cancelled = true;
     };
-  }, [user, router]);
+    // Chỉ hydrate 1 lần cho mỗi userId (xem ghi chú o client layout) — tránh
+    // re-hydrate khi useCurrentUser doi reference luc auth state thay doi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, router]);
 
   if (!user || hydrated !== user.id) {
     return (
