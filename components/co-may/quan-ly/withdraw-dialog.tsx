@@ -49,7 +49,10 @@ export function WithdrawDialog({
   const fmt = (n: number) => formatMoney(n, unit);
   const symbol = UNIT_SYMBOL[resolveUnit(unit)];
   // `amount` lưu THEO đơn vị hiển thị; quy về USD khi ghi nhận.
-  const [amount, setAmount] = useState(toDisplay(presetAmount, unit));
+  // Làm tròn để tránh sai số float (vd toDisplay(0.30,"USC") = 30.0000000000004
+  // → ô input hiện số loạn thay vì 30).
+  const presetDisplay = Math.max(0, Math.round(toDisplay(presetAmount, unit)));
+  const [amount, setAmount] = useState(presetDisplay);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [celebrating, setCelebrating] = useState<{ amount: number; anchor: number } | null>(null);
@@ -57,7 +60,7 @@ export function WithdrawDialog({
 
   // Reset amount khi dialog mở lại với preset mới
   useEffect(() => {
-    if (open) setAmount(toDisplay(presetAmount, unit));
+    if (open) setAmount(Math.max(0, Math.round(toDisplay(presetAmount, unit))));
   }, [open, presetAmount, unit]);
 
   useEffect(() => {
