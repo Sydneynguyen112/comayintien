@@ -32,10 +32,17 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-async function getCryptoKey(): Promise<CryptoKey> {
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(b64);
+  const out = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function getCryptoKey(usages: KeyUsage[]): Promise<CryptoKey> {
   const hex = process.env.ENCRYPTION_KEY;
   if (!hex) throw new Error("ENCRYPTION_KEY chưa được set trong env");
-  return crypto.subtle.importKey("raw", hexToBytes(hex), { name: "AES-GCM" }, false, ["encrypt"]);
+  return crypto.subtle.importKey("raw", hexToBytes(hex), { name: "AES-GCM" }, false, usages);
 }
 
 /**
@@ -43,7 +50,7 @@ async function getCryptoKey(): Promise<CryptoKey> {
  * Mỗi lần gọi sinh nonce ngẫu nhiên → ciphertext khác nhau dù plaintext giống.
  */
 export async function encryptMt5Password(plaintext: string): Promise<string> {
-  const key = await getCryptoKey();
+  const key = await getCryptoKey(["encrypt"]);
   // Explicit ArrayBuffer cho cả nonce, plaintext, combined — tránh ArrayBufferLike widening.
   const nonce = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(NONCE_SIZE)));
   const plaintextBytes = new TextEncoder().encode(plaintext);
@@ -57,4 +64,24 @@ export async function encryptMt5Password(plaintext: string): Promise<string> {
   combined.set(nonce, 0);
   combined.set(ciphertext, NONCE_SIZE);
   return bytesToBase64(combined);
+}
+
+/**
+ * Giải mã ciphertext base64 → plaintext. Ngược lại của encryptMt5Password.
+ * Dùng server-side ONLY (cần ENCRYPTION_KEY).
+ */
+export async function decryptMt5Password(b64Ciphertext: string): Promise<string> {
+  const key = await getCryptoKey(["decrypt"]);
+  const combined = base64ToBytes(b64Ciphertext);
+  if (combined.length < NONCE_SIZE + 16) {
+    throw new Error("Ciphertext quá ngắn (cần ≥ 28 byte = 12 nonce + 16 tag).");
+  }
+  const nonce = combined.subarray(0, NONCE_SIZE);
+  const ciphertext = combined.subarray(NONCE_SIZE);
+  const plaintextBuf = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: nonce },
+    key,
+    ciphertext,
+  );
+  return new TextDecoder().decode(plaintextBuf);
 }

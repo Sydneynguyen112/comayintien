@@ -4,7 +4,7 @@
 // Chạy server-side để bảo vệ SUPABASE_SERVICE_ROLE_KEY + ENCRYPTION_KEY khỏi client.
 
 import { createClient } from "@supabase/supabase-js";
-import { encryptMt5Password } from "./mt5-crypto";
+import { decryptMt5Password, encryptMt5Password } from "./mt5-crypto";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -208,4 +208,33 @@ export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResu
   }
 
   return { success: true, mt5AccountId };
+}
+
+/**
+ * Admin: lấy password đã giải mã của 1 MT5 account để login thủ công trên MT5.
+ * Server-side ONLY (cần ENCRYPTION_KEY). UI gate phải đảm bảo chỉ admin gọi được.
+ */
+export async function getMt5DecryptedPassword(accountId: string): Promise<{
+  success: boolean;
+  password?: string;
+  error?: string;
+}> {
+  const sb = serviceClient();
+  const res = await sb
+    .from("mt5_accounts")
+    .select("encrypted_password")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (res.error) return { success: false, error: `Query fail: ${res.error.message}` };
+  if (!res.data) return { success: false, error: "Không tìm thấy MT5 account." };
+  const cipher = res.data.encrypted_password as string;
+  if (!cipher || cipher === "NOT_USED_FOR_EA") {
+    return { success: false, error: "Account này không lưu password (vd account tạo cho EA flow)." };
+  }
+  try {
+    const plain = await decryptMt5Password(cipher);
+    return { success: true, password: plain };
+  } catch (e) {
+    return { success: false, error: `Decrypt fail: ${(e as Error).message}` };
+  }
 }

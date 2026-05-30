@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, BookText, CheckCircle2, ChevronDown, ChevronRight, Clock, Trash2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCurrentUser } from "@/lib/auth";
 import { cn, formatDate } from "@/lib/utils";
@@ -133,7 +133,15 @@ export default function AdminMt5Page() {
               Theo dõi {accounts.length} tài khoản MT5 đang sync — lệnh ra vào + nạp/rút thật.
             </p>
           </div>
-          <Mt5AddDialog onCreated={loadData} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/admin/mt5/danh-ba">
+              <Button variant="outline" size="sm">
+                <BookText className="h-4 w-4" />
+                Danh bạ MT5
+              </Button>
+            </Link>
+            <Mt5AddDialog onCreated={loadData} />
+          </div>
         </div>
 
         {loading ? (
