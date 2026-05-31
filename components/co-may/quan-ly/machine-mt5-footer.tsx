@@ -20,8 +20,11 @@ interface Props {
 type Status = "loading" | "unlinked" | "linked";
 
 interface LinkedInfo {
+  accountId: string;
   accountStatus: string;
   lastError: string | null;
+  login: string;
+  server: string;
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; tone: string; label: string }> = {
@@ -50,14 +53,17 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
 
     const accRes = await supabase
       .from("mt5_accounts")
-      .select("status, last_error")
+      .select("id, status, last_error, login, server")
       .eq("id", linkRes.data.mt5_account_id)
       .maybeSingle();
 
     setStatus("linked");
     setInfo({
+      accountId: accRes.data?.id ?? linkRes.data.mt5_account_id,
       accountStatus: accRes.data?.status ?? "pending",
       lastError: accRes.data?.last_error ?? null,
+      login: accRes.data?.login ?? "",
+      server: accRes.data?.server ?? "",
     });
   }, [machineId]);
 
@@ -92,19 +98,33 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
   const isError = info!.accountStatus === "error";
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border px-2.5 py-1.5 text-[11px] flex items-center gap-1.5 w-full",
-        cfg.tone,
-      )}
-      title={info!.lastError ?? cfg.label}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
-      <span className="font-medium truncate">{cfg.label}</span>
-      {isError && info!.lastError && (
-        <span className="italic text-[10px] truncate min-w-0 opacity-80">
-          {info!.lastError.slice(0, 30)}…
-        </span>
+    <div className="space-y-1.5">
+      <div
+        className={cn(
+          "rounded-lg border px-2.5 py-1.5 text-[11px] flex items-center gap-1.5 w-full",
+          cfg.tone,
+        )}
+        title={info!.lastError ?? cfg.label}
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="font-medium truncate">{cfg.label}</span>
+        {isError && info!.lastError && (
+          <span className="italic text-[10px] truncate min-w-0 opacity-80">
+            {info!.lastError.slice(0, 30)}…
+          </span>
+        )}
+      </div>
+      {isError && canLink && (
+        <Mt5LinkDialog
+          userId={userId}
+          machineId={machineId}
+          machineName={machineName}
+          existingAccountId={info!.accountId}
+          existingLogin={info!.login}
+          existingServer={info!.server}
+          urgent
+          onLinked={loadStatus}
+        />
       )}
     </div>
   );
