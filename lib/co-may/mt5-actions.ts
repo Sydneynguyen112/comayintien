@@ -211,6 +211,73 @@ export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResu
 }
 
 /**
+ * Cập nhật credentials của 1 MT5 account đã tồn tại (khách nhập sai → sửa lại).
+ * Verify ownership qua mt5_machine_links → comay_machines.user_id phải khớp userId.
+ * Reset status='pending', clear last_error/last_synced_at để daemon retry lại từ đầu.
+ */
+export interface Mt5UpdateInput {
+  mt5AccountId: string;
+  userId: string;
+  login: string;
+  password: string;
+  server: string;
+}
+
+export async function updateMt5Credentials(input: Mt5UpdateInput): Promise<Mt5LinkResult> {
+  const sb = serviceClient();
+
+  // Verify account đang link tới 1 cỗ máy thuộc user này
+  const linkRes = await sb
+    .from("mt5_machine_links")
+    .select("machine_id")
+    .eq("mt5_account_id", input.mt5AccountId)
+    .maybeSingle();
+  if (linkRes.error) return { success: false, error: `Query link fail: ${linkRes.error.message}` };
+  if (!linkRes.data) return { success: false, error: "MT5 account chưa được liên kết với cỗ máy nào." };
+
+  const machineRes = await sb
+    .from("comay_machines")
+    .select("user_id")
+    .eq("id", linkRes.data.machine_id)
+    .maybeSingle();
+  if (machineRes.error) return { success: false, error: `Query machine fail: ${machineRes.error.message}` };
+  if (!machineRes.data) return { success: false, error: "Cỗ máy không tồn tại." };
+  if (machineRes.data.user_id !== input.userId) {
+    return { success: false, error: "Bạn không có quyền cập nhật MT5 này." };
+  }
+
+  // Encrypt password mới
+  let encryptedPassword: string;
+  try {
+    encryptedPassword = await encryptMt5Password(input.password);
+  } catch (e) {
+    return { success: false, error: `Lỗi mã hoá password: ${(e as Error).message}` };
+  }
+
+  // Update + reset status để daemon retry
+  const res = await sb
+    .from("mt5_accounts")
+    .update({
+      login: input.login.trim(),
+      server: input.server.trim(),
+      encrypted_password: encryptedPassword,
+      broker_name: input.server.trim().split("-")[0] || null,
+      status: "pending",
+      last_error: null,
+      last_synced_at: null,
+    })
+    .eq("id", input.mt5AccountId);
+  if (res.error) {
+    const code = res.error.code;
+    if (code === "23505") {
+      return { success: false, error: `Account ${input.login}@${input.server} đã được dùng cho cỗ máy khác.` };
+    }
+    return { success: false, error: `Update fail [code=${code}]: ${res.error.message}` };
+  }
+  return { success: true, mt5AccountId: input.mt5AccountId };
+}
+
+/**
  * Admin: lấy password đã giải mã của 1 MT5 account để login thủ công trên MT5.
  * Server-side ONLY (cần ENCRYPTION_KEY). UI gate phải đảm bảo chỉ admin gọi được.
  */

@@ -77,17 +77,18 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
         setJustConnected(true);
       }
       prevStatusRef.current = newStatus;
+      // Lưu login + server LUÔN (cần cho dialog update). Hiển thị mới gate theo showCredentials.
       setState({
         accountId: accRes.data.id,
         status: newStatus,
         lastError: accRes.data.last_error,
         lastSyncedAt: accRes.data.last_synced_at,
-        login: showCredentials ? accRes.data.login : null,
-        server: showCredentials ? accRes.data.server : null,
+        login: accRes.data.login,
+        server: accRes.data.server,
       });
     }
     setLoading(false);
-  }, [machineId, showCredentials]);
+  }, [machineId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -202,6 +203,21 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
       {state.lastError && state.status === "error" && (
         <div className="rounded border border-red-500/30 bg-red-500/5 px-2 py-1 text-[11px] text-red-600 dark:text-red-400">
           ⚠ {state.lastError.length > 200 ? state.lastError.slice(0, 200) + "…" : state.lastError}
+        </div>
+      )}
+
+      {canLink && (
+        <div className="pt-1">
+          <Mt5LinkDialog
+            userId={userId}
+            machineId={machineId}
+            machineName={machineName}
+            existingAccountId={state.accountId}
+            existingLogin={state.login ?? undefined}
+            existingServer={state.server ?? undefined}
+            urgent={state.status === "error"}
+            onLinked={load}
+          />
         </div>
       )}
 

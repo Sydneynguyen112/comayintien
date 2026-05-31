@@ -4,8 +4,8 @@
 // Khác customer flow (đã revert): admin thao tác trên máy có sẵn → server action
 // không bị race với cloudPush.machine fire-and-forget.
 
-import { useState } from "react";
-import { Activity, Eye, EyeOff, Plug } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, Eye, EyeOff, Pencil, Plug, RefreshCw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,28 +17,53 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { linkMt5ToMachine } from "@/lib/co-may/mt5-actions";
+import { linkMt5ToMachine, updateMt5Credentials } from "@/lib/co-may/mt5-actions";
 
 interface Props {
   userId: string;
   machineId: string;
   machineName: string;
   onLinked?: () => void;
+  // Update mode: nếu có existingAccountId → form cập nhật credentials cho account đã tồn tại
+  // (vd khi khách nhập sai password lần đầu, status='error' → cho phép sửa lại).
+  existingAccountId?: string;
+  existingLogin?: string;
+  existingServer?: string;
+  // urgent=true → trigger button màu đỏ (dùng khi status='error' để gây chú ý).
+  urgent?: boolean;
 }
 
-export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Props) {
+export function Mt5LinkDialog({
+  userId,
+  machineId,
+  machineName,
+  onLinked,
+  existingAccountId,
+  existingLogin,
+  existingServer,
+  urgent,
+}: Props) {
+  const isUpdate = !!existingAccountId;
   const [open, setOpen] = useState(false);
-  const [login, setLogin] = useState("");
+  const [login, setLogin] = useState(existingLogin ?? "");
   const [password, setPassword] = useState("");
-  const [server, setServer] = useState("");
+  const [server, setServer] = useState(existingServer ?? "");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Re-sync local state nếu prop existingLogin/Server thay đổi (vd panel reload).
+  useEffect(() => {
+    if (isUpdate) {
+      setLogin(existingLogin ?? "");
+      setServer(existingServer ?? "");
+    }
+  }, [isUpdate, existingLogin, existingServer]);
+
   function reset() {
-    setLogin("");
+    setLogin(existingLogin ?? "");
     setPassword("");
-    setServer("");
+    setServer(existingServer ?? "");
     setShowPassword(false);
     setError(null);
   }
@@ -56,13 +81,21 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
     }
 
     setSubmitting(true);
-    const res = await linkMt5ToMachine({
-      userId,
-      machineId,
-      login: login.trim(),
-      password,
-      server: server.trim(),
-    });
+    const res = isUpdate
+      ? await updateMt5Credentials({
+          mt5AccountId: existingAccountId!,
+          userId,
+          login: login.trim(),
+          password,
+          server: server.trim(),
+        })
+      : await linkMt5ToMachine({
+          userId,
+          machineId,
+          login: login.trim(),
+          password,
+          server: server.trim(),
+        });
     setSubmitting(false);
 
     if (!res.success) {
@@ -75,6 +108,26 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
     onLinked?.();
   }
 
+  // Trigger button khác nhau theo mode + urgent
+  const triggerBtn = isUpdate ? (
+    urgent ? (
+      <Button variant="destructive" size="sm">
+        <RefreshCw className="h-3.5 w-3.5" />
+        Liên kết lại MT5
+      </Button>
+    ) : (
+      <Button variant="outline" size="sm">
+        <Pencil className="h-3.5 w-3.5" />
+        Cập nhật MT5
+      </Button>
+    )
+  ) : (
+    <Button variant="outline" size="sm" className="w-full">
+      <Plug className="h-3.5 w-3.5" />
+      Liên kết MT5
+    </Button>
+  );
+
   return (
     <Dialog
       open={open}
@@ -83,20 +136,18 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
         if (!v) reset();
       }}
     >
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm" className="w-full">
-            <Plug className="h-3.5 w-3.5" />
-            Liên kết MT5
-          </Button>
-        }
-      />
+      <DialogTrigger render={triggerBtn} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Liên kết MT5 vào "{machineName}"</DialogTitle>
+          <DialogTitle>
+            {isUpdate
+              ? `Cập nhật MT5 cho "${machineName}"`
+              : `Liên kết MT5 vào "${machineName}"`}
+          </DialogTitle>
           <DialogDescription>
-            Hệ thống sẽ đọc data MT5 qua INVESTOR password (read-only) và sync
-            vào Supabase mỗi 5 phút để chấm điểm kỷ luật.
+            {isUpdate
+              ? "Sửa lại login/password/server nếu nhập sai. Sau khi lưu, hệ thống sẽ thử kết nối lại trong vòng 1 phút."
+              : "Hệ thống sẽ đọc data MT5 qua INVESTOR password (read-only) và sync vào Supabase mỗi 1 phút để chấm điểm kỷ luật."}
           </DialogDescription>
         </DialogHeader>
 
@@ -169,7 +220,9 @@ export function Mt5LinkDialog({ userId, machineId, machineName, onLinked }: Prop
               className="bg-foreground text-background hover:bg-foreground/90 disabled:opacity-60"
             >
               <Activity className="h-3.5 w-3.5" />
-              {submitting ? "Đang liên kết..." : "Liên kết"}
+              {submitting
+                ? isUpdate ? "Đang cập nhật..." : "Đang liên kết..."
+                : isUpdate ? "Lưu thay đổi" : "Liên kết"}
             </Button>
           </DialogFooter>
         </form>
