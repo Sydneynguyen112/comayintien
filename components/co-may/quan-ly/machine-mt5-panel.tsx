@@ -38,7 +38,7 @@ function timeSince(iso: string | null): string {
   if (!iso) return "Chưa từng";
   const diffMs = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diffMs / (1000 * 60));
-  if (m < 1) return "Realtime";
+  if (m < 1) return "Đang hoạt động";
   if (m < 60) return `${m} phút trước`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} giờ trước`;
