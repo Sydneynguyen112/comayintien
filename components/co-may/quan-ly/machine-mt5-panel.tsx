@@ -53,7 +53,8 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
   const prevStatusRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // KHÔNG setLoading(true) ở đây — chỉ initial render dùng loading state ban đầu (=true).
+    // Background polls update state lặng, tránh flicker skeleton mỗi 30s.
     const linkRes = await supabase
       .from("mt5_machine_links")
       .select("mt5_account_id")
@@ -92,10 +93,14 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
 
   useEffect(() => { load(); }, [load]);
 
-  // Poll mỗi 15s khi status còn 'pending' (chờ daemon sync lần đầu) — dừng khi đã 'active'.
+  // Poll DB để "Sync cuối" + status luôn fresh.
+  //   pending: 15s (chờ daemon sync lần đầu, nhanh để bắt khoảnh khắc active sớm)
+  //   active/error: 30s (status đã settle, chỉ cần refresh "sync cuối")
+  //   disabled: không poll (admin tắt thủ công)
   useEffect(() => {
-    if (state?.status !== "pending") return;
-    const interval = setInterval(() => load(), 15000);
+    if (!state || state.status === "disabled") return;
+    const intervalMs = state.status === "pending" ? 15000 : 30000;
+    const interval = setInterval(() => load(), intervalMs);
     return () => clearInterval(interval);
   }, [state?.status, load]);
 

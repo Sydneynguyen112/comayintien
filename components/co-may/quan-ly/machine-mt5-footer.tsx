@@ -39,7 +39,8 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
   const [info, setInfo] = useState<LinkedInfo | null>(null);
 
   const loadStatus = useCallback(async () => {
-    setStatus("loading");
+    // KHÔNG setStatus("loading") ở đây — chỉ initial render dùng status="loading" ban đầu.
+    // Background polls update state lặng, tránh flicker skeleton mỗi 30s.
     const linkRes = await supabase
       .from("mt5_machine_links")
       .select("mt5_account_id")
@@ -70,6 +71,16 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
   useEffect(() => {
     loadStatus();
   }, [loadStatus]);
+
+  // Poll để "Sync cuối" + status luôn fresh khi đã link.
+  //   pending: 15s, active/error: 30s, unlinked/disabled: không poll.
+  useEffect(() => {
+    if (status !== "linked" || !info) return;
+    if (info.accountStatus === "disabled") return;
+    const intervalMs = info.accountStatus === "pending" ? 15000 : 30000;
+    const interval = setInterval(() => loadStatus(), intervalMs);
+    return () => clearInterval(interval);
+  }, [status, info?.accountStatus, loadStatus]);
 
   if (status === "loading") {
     return <div className="h-7 rounded bg-muted/40 animate-pulse" />;
