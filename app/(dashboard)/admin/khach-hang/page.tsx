@@ -47,12 +47,14 @@ const roleLabels: Record<string, string> = {
   student: "Khách hàng",
   mentor: "Mentor",
   admin:  "Admin",
+  super_admin: "Super Admin",
 };
 
 const roleStyles: Record<string, string> = {
   student: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
   mentor:  "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
   admin:   "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+  super_admin: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-500/30",
 };
 
 const statusStyles: Record<UserStatus, string> = {
@@ -77,7 +79,7 @@ export default function AdminKhachHangPage() {
       supabase
         .from("profiles")
         .select("*")
-        .in("role", ["student", "mentor", "admin"])
+        .in("role", ["student", "mentor", "admin", "super_admin"])
         .order("created_at", { ascending: false }),
       supabase
         .from("apps_access")
