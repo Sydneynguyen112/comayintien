@@ -28,7 +28,7 @@ interface LinkedInfo {
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; tone: string; label: string }> = {
-  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",  label: "MT5 đang sync" },
+  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30",  label: "MT5 đã kết nối" },
   pending:  { icon: Clock,        tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",          label: "MT5 chờ sync" },
   error:    { icon: XCircle,      tone: "text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/30",                  label: "MT5 lỗi" },
   disabled: { icon: AlertCircle,  tone: "text-muted-foreground bg-muted border-border",                                    label: "MT5 tắt" },

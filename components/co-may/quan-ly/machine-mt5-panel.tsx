@@ -28,7 +28,7 @@ interface MT5State {
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; tone: string; bg: string; label: string }> = {
-  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30", label: "Đang đồng bộ" },
+  active:   { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30", label: "Kết nối thành công" },
   pending:  { icon: Clock,        tone: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-500/10 border-amber-500/30",     label: "Chờ sync lần đầu" },
   error:    { icon: XCircle,      tone: "text-red-600 dark:text-red-400",         bg: "bg-red-500/10 border-red-500/30",         label: "Lỗi kết nối" },
   disabled: { icon: AlertCircle,  tone: "text-muted-foreground",                  bg: "bg-muted border-border",                  label: "Đã tắt" },
@@ -38,7 +38,7 @@ function timeSince(iso: string | null): string {
   if (!iso) return "Chưa từng";
   const diffMs = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diffMs / (1000 * 60));
-  if (m < 1) return "Vừa xong";
+  if (m < 1) return "Realtime";
   if (m < 60) return `${m} phút trước`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} giờ trước`;
@@ -192,7 +192,7 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
 
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Sync cuối</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Trạng thái đồng bộ</div>
           <div className="font-medium tabular-nums">{timeSince(state.lastSyncedAt)}</div>
         </div>
         {showCredentials && state.login && state.server && (
