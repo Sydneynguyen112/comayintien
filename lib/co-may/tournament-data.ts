@@ -99,17 +99,22 @@ export async function countApprovedByTournament(): Promise<Record<string, number
   return out;
 }
 
-interface TxRow {
-  machine_id: string;
-  type: string;
-  amount: number;
+interface Mt5TradeRow {
+  mt5_account_id: string;
+  profit: number | null;
+  swap: number | null;
+  commission: number | null;
   volume: number | null;
-  created_at: string;
+  time_close: string | null;
 }
 
 /**
- * Leaderboard tính động: registrations approved → máy + giao dịch (sau baseline_at)
- * → metric theo giải. Sort desc theo metric chính, gán rank.
+ * Leaderboard tính động theo KẾT QUẢ MT5 THẬT (KHÔNG dùng log tay):
+ *   registrations approved → cỗ máy → MT5 account (qua mt5_machine_links) →
+ *   các lệnh ĐÃ ĐÓNG trong cửa sổ giải (time_close ∈ [baseline_at, end_date]).
+ * PnL = Σ(profit + swap + commission); %tăng trưởng = PnL / vốn cỗ máy (USD canonical).
+ * Máy chưa kết nối MT5 → không có dữ liệu thật → score 0, mt5_linked=false,
+ * và luôn xếp dưới các máy đã kết nối.
  */
 export async function computeLeaderboard(tournament: Tournament): Promise<LeaderboardEntry[]> {
   const regs = await listRegistrations(tournament.id, "approved");
@@ -118,11 +123,38 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
   const machineIds = regs.map((r) => r.machine_id);
   const userIds = Array.from(new Set(regs.map((r) => r.user_id)));
 
-  const [machinesRes, txRes, profilesRes] = await Promise.all([
+  // machine_id → mt5_account_id (ưu tiên link is_primary nếu 1 máy có nhiều link)
+  const { data: linkRows } = await supabase
+    .from("mt5_machine_links")
+    .select("machine_id, mt5_account_id, is_primary")
+    .in("machine_id", machineIds);
+  const accountByMachine = new Map<string, string>();
+  for (const l of (linkRows ?? []) as {
+    machine_id: string;
+    mt5_account_id: string;
+    is_primary: boolean | null;
+  }[]) {
+    if (!accountByMachine.has(l.machine_id) || l.is_primary) {
+      accountByMachine.set(l.machine_id, l.mt5_account_id);
+    }
+  }
+  const accountIds = Array.from(new Set([...accountByMachine.values()]));
+
+  const [machinesRes, profilesRes] = await Promise.all([
     supabase.from("comay_machines").select("id, name, capital, currency_unit").in("id", machineIds),
-    supabase.from("comay_transactions").select("machine_id, type, amount, volume, created_at").in("machine_id", machineIds),
     supabase.from("profiles").select("id, full_name").in("id", userIds),
   ]);
+
+  // Lệnh MT5 đã đóng của tất cả account liên quan (guard tránh .in([]) rỗng).
+  let tradeRows: Mt5TradeRow[] = [];
+  if (accountIds.length > 0) {
+    const { data } = await supabase
+      .from("mt5_trades")
+      .select("mt5_account_id, profit, swap, commission, volume, time_close")
+      .in("mt5_account_id", accountIds)
+      .eq("is_closed", true);
+    tradeRows = (data ?? []) as Mt5TradeRow[];
+  }
 
   const machineById = new Map(
     ((machinesRes.data ?? []) as { id: string; name: string; capital: number; currency_unit: string | null }[]).map(
@@ -132,27 +164,38 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
   const nameByUser = new Map(
     ((profilesRes.data ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? "—"]),
   );
-  const txByMachine = new Map<string, TxRow[]>();
-  for (const t of (txRes.data ?? []) as TxRow[]) {
-    const arr = txByMachine.get(t.machine_id) ?? [];
+  const tradesByAccount = new Map<string, Mt5TradeRow[]>();
+  for (const t of tradeRows) {
+    const arr = tradesByAccount.get(t.mt5_account_id) ?? [];
     arr.push(t);
-    txByMachine.set(t.machine_id, arr);
+    tradesByAccount.set(t.mt5_account_id, arr);
   }
+
+  const endMs = tournament.end_date ? new Date(tournament.end_date).getTime() : Infinity;
+
+  const pnlOf = (t: Mt5TradeRow) =>
+    (Number(t.profit) || 0) + (Number(t.swap) || 0) + (Number(t.commission) || 0);
 
   const entries: LeaderboardEntry[] = regs.map((r) => {
     const m = machineById.get(r.machine_id);
+    const accountId = accountByMachine.get(r.machine_id) ?? null;
     const baselineAt = r.baseline_at ? new Date(r.baseline_at).getTime() : 0;
-    const baseline = Number(r.baseline_balance ?? m?.capital ?? 0) || 0;
-    const txs = (txByMachine.get(r.machine_id) ?? []).filter(
-      (t) => new Date(t.created_at).getTime() >= baselineAt,
-    );
-    const trades = txs.filter((t) => t.type === "trade_win" || t.type === "trade_loss");
-    const pnl = trades.reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const wins = trades.filter((t) => (Number(t.amount) || 0) > 0).length;
+    // Mẫu số = vốn cỗ máy thật (USD canonical), KHÔNG dùng số liệu log tay.
+    // Fallback baseline_balance chỉ khi thiếu capital.
+    const denom = Number(m?.capital) || Number(r.baseline_balance ?? 0) || 0;
+
+    // Chỉ lệnh ĐÃ ĐÓNG trong cửa sổ giải [baseline_at, end_date].
+    const trades = (accountId ? tradesByAccount.get(accountId) ?? [] : []).filter((t) => {
+      if (!t.time_close) return false;
+      const ts = new Date(t.time_close).getTime();
+      return ts >= baselineAt && ts <= endMs;
+    });
+    const pnl = trades.reduce((s, t) => s + pnlOf(t), 0);
     const tradeCount = trades.length;
+    const wins = trades.filter((t) => pnlOf(t) > 0).length;
     const winRate = tradeCount > 0 ? wins / tradeCount : 0;
     const volume = trades.reduce((s, t) => s + (Number(t.volume) || 0), 0);
-    const pnlPct = baseline > 0 ? (pnl / baseline) * 100 : 0;
+    const pnlPct = denom > 0 ? (pnl / denom) * 100 : 0;
     const score =
       tournament.leaderboard_metric === "win_rate"
         ? winRate * 100
@@ -172,10 +215,15 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
       volume,
       trade_count: tradeCount,
       score,
+      mt5_linked: accountId !== null,
     };
   });
 
-  entries.sort((a, b) => b.score - a.score);
+  // Máy đã kết nối MT5 luôn xếp trên máy chưa kết nối; cùng nhóm thì sort theo score.
+  entries.sort((a, b) => {
+    if (a.mt5_linked !== b.mt5_linked) return a.mt5_linked ? -1 : 1;
+    return b.score - a.score;
+  });
   entries.forEach((e, i) => (e.rank = i + 1));
   return entries;
 }

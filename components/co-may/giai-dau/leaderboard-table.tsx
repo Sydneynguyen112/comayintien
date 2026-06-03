@@ -66,7 +66,14 @@ export function LeaderboardTable({
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="font-medium text-foreground truncate max-w-[220px]">{e.machine_name}</div>
-                  <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">{e.display_name}</div>
+                  <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">
+                    {e.display_name}
+                    {!e.mt5_linked && (
+                      <span className="ml-1.5 text-[10px] text-amber-600 dark:text-amber-400">
+                        · chưa kết nối MT5
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-2.5 text-right font-bold tabular-nums text-primary">{scoreText(e, metric)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums hidden md:table-cell">

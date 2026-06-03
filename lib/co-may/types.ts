@@ -155,4 +155,5 @@ export interface LeaderboardEntry {
   volume: number;      // tổng volume sau baseline
   trade_count: number;
   score: number;       // giá trị theo metric của giải (để sort + hiển thị)
+  mt5_linked: boolean; // máy đã kết nối MT5 chưa (nguồn xếp hạng là MT5 thật)
 }
