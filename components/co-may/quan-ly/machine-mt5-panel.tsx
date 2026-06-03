@@ -5,9 +5,10 @@
 // Customer view: chỉ status + last_sync, KHÔNG hiện login/password/balance.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Anchor, CheckCircle2, Clock, RefreshCcw, Sparkles, XCircle } from "lucide-react";
+import { AlertCircle, Anchor, CheckCircle2, Clock, RefreshCcw, Sparkles, Unplug, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { unlinkMt5FromMachine } from "@/lib/co-may/mt5-actions";
 import { Mt5LinkDialog } from "@/components/admin/mt5-link-dialog";
 
 interface Props {
@@ -51,6 +52,9 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
   const [state, setState] = useState<MT5State | null>(null);
   const [justConnected, setJustConnected] = useState(false);
   const prevStatusRef = useRef<string | null>(null);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const [unlinkErr, setUnlinkErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     // KHÔNG setLoading(true) ở đây — chỉ initial render dùng loading state ban đầu (=true).
@@ -92,6 +96,23 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
   }, [machineId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleUnlink() {
+    if (unlinking) return;
+    setUnlinking(true);
+    setUnlinkErr(null);
+    const res = await unlinkMt5FromMachine(machineId);
+    setUnlinking(false);
+    if (res.success) {
+      // Về trạng thái chưa link ngay; load() refresh lại từ DB cho chắc.
+      setConfirmUnlink(false);
+      prevStatusRef.current = null;
+      setState(null);
+      load();
+    } else {
+      setUnlinkErr(res.error ?? "Ngắt kết nối thất bại.");
+    }
+  }
 
   // Poll DB để "Sync cuối" + status luôn fresh.
   //   pending: 15s (chờ daemon sync lần đầu, nhanh để bắt khoảnh khắc active sớm)
@@ -212,7 +233,7 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
       )}
 
       {canLink && (
-        <div className="pt-1">
+        <div className="pt-1 space-y-2">
           <Mt5LinkDialog
             userId={userId}
             machineId={machineId}
@@ -223,6 +244,48 @@ export function MachineMt5Panel({ machineId, machineName, userId, canLink, showC
             urgent={state.status === "error"}
             onLinked={load}
           />
+
+          {!confirmUnlink ? (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmUnlink(true);
+                setUnlinkErr(null);
+              }}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            >
+              <Unplug className="h-3 w-3" /> Ngắt kết nối MT5
+            </button>
+          ) : (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-2.5 space-y-2">
+              <p className="text-[11px] text-foreground">
+                Ngắt MT5 khỏi cỗ máy này? Lịch sử lệnh vẫn được giữ — bạn có thể
+                kết nối MT5 này cho một cỗ máy khác sau đó.
+              </p>
+              {unlinkErr && (
+                <p className="text-[11px] text-red-600 dark:text-red-400">{unlinkErr}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleUnlink}
+                  disabled={unlinking}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 text-white px-2.5 py-1 text-[11px] font-medium hover:bg-red-700 disabled:opacity-60"
+                >
+                  <Unplug className="h-3 w-3" />
+                  {unlinking ? "Đang ngắt..." : "Ngắt kết nối"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmUnlink(false)}
+                  disabled={unlinking}
+                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+                >
+                  Huỷ
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
