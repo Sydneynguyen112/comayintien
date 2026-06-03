@@ -19,7 +19,9 @@ export function HieuSuatView({ role }: { role: RoleSlug }) {
 
   const data = useMemo(() => {
     if (!user) return null;
-    const userIds = getUserScope(user.role ?? role, user.id);
+    // Scope theo role của TRANG (prop `role`), không theo role hồ sơ — admin/mentor
+    // trên trang cá nhân /client phải thấy cỗ máy của chính mình, không phải demo.
+    const userIds = getUserScope(role, user.id);
     return {
       machines: getMachinesForScope(userIds),
       tx: getTxForScope(userIds),

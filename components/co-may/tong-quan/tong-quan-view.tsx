@@ -22,7 +22,10 @@ export function TongQuanView({ role }: { role: RoleSlug }) {
 
   const data = useMemo(() => {
     if (!user) return null;
-    const userIds = getUserScope(user.role ?? role, user.id);
+    // Scope phải theo role của TRANG (prop `role`), KHÔNG theo role hồ sơ.
+    // Admin/mentor xem trang cá nhân /client phải thấy cỗ máy của chính mình,
+    // không phải DEMO_USER_IDS. Trang /mentor, /admin vẫn truyền role tương ứng.
+    const userIds = getUserScope(role, user.id);
     const machines = getMachinesForScope(userIds);
     const tx = getTxForScope(userIds);
     const setup = getSetup(user.id);

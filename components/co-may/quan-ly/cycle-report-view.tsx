@@ -33,7 +33,7 @@ export function CycleReportView({
 
   const report = useMemo<{ r: CycleReport; resolvedOwner: string } | null>(() => {
     if (!user) return null;
-    const scope = getUserScope(user.role ?? role, user.id);
+    const scope = getUserScope(role, user.id);
     const candidates = ownerId && scope.includes(ownerId) ? [ownerId] : [user.id, ...scope];
     for (const id of candidates) {
       const r = getReportById(id, reportId);

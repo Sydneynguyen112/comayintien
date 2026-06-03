@@ -34,7 +34,9 @@ export function QuanLyListView({ role }: { role: RoleSlug }) {
 
   useEffect(() => {
     if (!user) return;
-    const userIds = getUserScope(user.role ?? role, user.id);
+    // Scope theo role của TRANG (prop `role`), không theo role hồ sơ — admin/mentor
+    // trên trang cá nhân /client phải thấy cỗ máy của chính mình, không phải demo.
+    const userIds = getUserScope(role, user.id);
     const allMachines: { ownerId: string; m: Machine }[] = [];
     const allTx: MachineTransaction[] = [];
     const allReports: CycleReport[] = [];

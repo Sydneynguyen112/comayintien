@@ -23,7 +23,8 @@ export function LichSuView({ role }: { role: RoleSlug }) {
 
   const data = useMemo(() => {
     if (!user) return null;
-    const userIds = getUserScope(user.role ?? role, user.id);
+    // Scope theo role của TRANG (prop `role`), không theo role hồ sơ.
+    const userIds = getUserScope(role, user.id);
     return {
       machines: getMachinesForScope(userIds),
       tx: getTxForScope(userIds),
