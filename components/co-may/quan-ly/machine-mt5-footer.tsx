@@ -5,9 +5,10 @@
 // Customer/admin chỉ thấy badge trạng thái, KHÔNG thấy login/password/balance.
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Clock, Plug, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Plug, Unplug, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { unlinkMt5FromMachine } from "@/lib/co-may/mt5-actions";
 import { Mt5LinkDialog } from "@/components/admin/mt5-link-dialog";
 
 interface Props {
@@ -37,6 +38,9 @@ const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; tone: string; l
 export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Props) {
   const [status, setStatus] = useState<Status>("loading");
   const [info, setInfo] = useState<LinkedInfo | null>(null);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const [unlinkErr, setUnlinkErr] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     // KHÔNG setStatus("loading") ở đây — chỉ initial render dùng status="loading" ban đầu.
@@ -81,6 +85,21 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
     const interval = setInterval(() => loadStatus(), intervalMs);
     return () => clearInterval(interval);
   }, [status, info?.accountStatus, loadStatus]);
+
+  async function handleUnlink() {
+    if (unlinking) return;
+    setUnlinking(true);
+    setUnlinkErr(null);
+    const res = await unlinkMt5FromMachine(machineId);
+    setUnlinking(false);
+    if (res.success) {
+      setConfirmUnlink(false);
+      setInfo(null);
+      setStatus("unlinked");
+    } else {
+      setUnlinkErr(res.error ?? "Ngắt kết nối thất bại.");
+    }
+  }
 
   if (status === "loading") {
     return <div className="h-7 rounded bg-muted/40 animate-pulse" />;
@@ -137,6 +156,48 @@ export function MachineMt5Footer({ machineId, machineName, userId, canLink }: Pr
           onLinked={loadStatus}
         />
       )}
+
+      {canLink &&
+        (!confirmUnlink ? (
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmUnlink(true);
+              setUnlinkErr(null);
+            }}
+            className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors px-1"
+          >
+            <Unplug className="h-3 w-3" /> Ngắt kết nối
+          </button>
+        ) : (
+          <div className="rounded-md border border-red-500/30 bg-red-500/5 px-2 py-1.5 space-y-1.5">
+            <p className="text-[10px] text-foreground leading-snug">
+              Ngắt MT5 khỏi cỗ máy này? Lịch sử lệnh vẫn được giữ.
+            </p>
+            {unlinkErr && (
+              <p className="text-[10px] text-red-600 dark:text-red-400">{unlinkErr}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUnlink}
+                disabled={unlinking}
+                className="inline-flex items-center gap-1 rounded bg-red-600 text-white px-2 py-0.5 text-[10px] font-medium hover:bg-red-700 disabled:opacity-60"
+              >
+                <Unplug className="h-2.5 w-2.5" />
+                {unlinking ? "Đang ngắt..." : "Ngắt"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmUnlink(false)}
+                disabled={unlinking}
+                className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+              >
+                Huỷ
+              </button>
+            </div>
+          </div>
+        ))}
     </div>
   );
 }
