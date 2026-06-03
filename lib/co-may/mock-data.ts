@@ -9,132 +9,9 @@ import type {
 import { cloudPush } from "./cloud-sync";
 import { trackEvent, Events } from "@/lib/analytics";
 
-// ── Deterministic PRNG (mulberry32) seeded by userId ──
-function hash(str: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed: number) {
-  return function () {
-    seed = (seed + 0x6d2b79f5) >>> 0;
-    let t = seed;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+// NOW/DAY: mốc thời gian tham chiếu cho computeKpi (days_active…).
 const NOW = new Date("2026-05-04T08:00:00Z").getTime();
 const DAY = 86400_000;
-
-const MACHINE_TEMPLATES = [
-  { name: "Cỗ máy chính — XAUUSD", capital: 5000 },
-  { name: "Cỗ máy phụ — EURUSD", capital: 2000 },
-  { name: "Cỗ máy thử nghiệm — BTC", capital: 1000 },
-  { name: "Cỗ máy scalping — GBPJPY", capital: 3000 },
-];
-
-// ── Generators ──
-
-function genMachines(userId: string, rand: () => number): Machine[] {
-  const count = Math.max(1, Math.floor(rand() * MACHINE_TEMPLATES.length) + 1);
-  const machines: Machine[] = [];
-  for (let i = 0; i < count; i++) {
-    const tpl = MACHINE_TEMPLATES[i];
-    const ageDays = Math.floor(rand() * 60) + 7;
-    const cycleAgeDays = Math.floor(rand() * Math.min(ageDays, 30));
-    const created = new Date(NOW - ageDays * DAY);
-    const cycleStart = cycleAgeDays > 0 ? new Date(NOW - cycleAgeDays * DAY) : null;
-    machines.push({
-      id: `mach-${userId}-${i + 1}`,
-      user_id: userId,
-      name: tpl.name,
-      capital: tpl.capital,
-      current_anchor: tpl.capital + Math.floor(rand() * 800) - 200,
-      cycle_started_at: cycleStart?.toISOString() ?? null,
-      status: rand() > 0.15 ? "active" : "paused",
-      created_at: created.toISOString(),
-      updated_at: new Date(NOW - Math.floor(rand() * 3) * DAY).toISOString(),
-    });
-  }
-  return machines;
-}
-
-function genTransactions(machine: Machine, rand: () => number): MachineTransaction[] {
-  const count = Math.floor(rand() * 20) + 12;
-  const txs: MachineTransaction[] = [];
-  const cycleStartTs = machine.cycle_started_at
-    ? new Date(machine.cycle_started_at).getTime()
-    : new Date(machine.created_at).getTime();
-  const span = Math.max(DAY, NOW - cycleStartTs);
-
-  for (let i = 0; i < count; i++) {
-    const r = rand();
-    let type: TransactionType;
-    let amount: number;
-    if (r < 0.55) {
-      type = "trade_win";
-      amount = Math.floor(rand() * 250) + 30;
-    } else if (r < 0.85) {
-      type = "trade_loss";
-      amount = -(Math.floor(rand() * 180) + 20);
-    } else if (r < 0.95) {
-      type = "withdraw";
-      amount = -(Math.floor(rand() * 400) + 100);
-    } else {
-      type = "anchor_change";
-      amount = Math.floor(rand() * 400) - 200;
-    }
-
-    const ts = cycleStartTs + Math.floor(rand() * span);
-    txs.push({
-      id: `tx-${machine.id}-${i + 1}`,
-      machine_id: machine.id,
-      user_id: machine.user_id,
-      type,
-      amount,
-      note: type === "trade_loss" ? "Stop-loss kỷ luật" : null,
-      created_at: new Date(ts).toISOString(),
-    });
-  }
-
-  txs.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return txs;
-}
-
-function genReports(machine: Machine, rand: () => number): CycleReport[] {
-  const count = Math.floor(rand() * 3) + 1;
-  const reports: CycleReport[] = [];
-  const baseStart = new Date(machine.created_at).getTime();
-  let cursor = baseStart;
-  for (let i = 0; i < count; i++) {
-    const cycleLen = Math.floor(rand() * 14 + 7) * DAY;
-    const start = cursor;
-    const end = Math.min(cursor + cycleLen, NOW - DAY);
-    if (end <= start) break;
-    cursor = end;
-    const pnl = Math.floor((rand() - 0.3) * 1500);
-    const withdrawn = pnl > 0 ? Math.floor(pnl * (0.3 + rand() * 0.4)) : 0;
-    reports.push({
-      id: `rep-${machine.id}-${i + 1}`,
-      machine_id: machine.id,
-      user_id: machine.user_id,
-      start_date: new Date(start).toISOString(),
-      end_date: new Date(end).toISOString(),
-      decision: pnl > 200 && rand() > 0.4 ? "scale" : "reset",
-      pnl,
-      withdrawn,
-      meta: { cycle_started_at: new Date(end + DAY).toISOString() },
-      created_at: new Date(end).toISOString(),
-    });
-  }
-  return reports;
-}
 
 // ── Cache + localStorage persistence ──
 // Mỗi user data persist localStorage để giữ qua reload / Vercel rebuild.
@@ -185,30 +62,17 @@ function getDataFor(userId: string): UserData {
   const cached = cache.get(userId);
   if (cached) return cached;
 
-  // Try load from localStorage trước khi seed
+  // Đọc từ localStorage (đã hydrate từ cloud). KHÔNG còn seed mock data —
+  // mọi user (kể cả demo cũ) bắt đầu rỗng; dữ liệu thật đến từ cloud qua
+  // hydrateFromCloud / hydrateManyFromCloud.
   const persisted = loadAllPersisted();
   if (persisted[userId]) {
     cache.set(userId, persisted[userId]);
     return persisted[userId];
   }
 
-  // Chỉ seed mock data cho demo users (u-student-XXX, u-mentor-XXX, u-admin-XXX).
-  // User thật (UUID từ Supabase) → bắt đầu empty, đi qua setup wizard.
-  const isDemoUser = /^u-(student|mentor|admin)-\d+$/.test(userId);
-  if (!isDemoUser) {
-    const data: UserData = { machines: [], tx: [], reports: [] };
-    cache.set(userId, data);
-    return data;
-  }
-
-  // Seed deterministic
-  const rand = mulberry32(hash(userId));
-  const machines = genMachines(userId, rand);
-  const tx = machines.flatMap((m) => genTransactions(m, rand));
-  const reports = machines.flatMap((m) => genReports(m, rand));
-  const data: UserData = { machines, tx, reports };
+  const data: UserData = { machines: [], tx: [], reports: [] };
   cache.set(userId, data);
-  persistDataFor(userId); // snapshot seed lần đầu
   return data;
 }
 
@@ -689,28 +553,40 @@ export function hasMoneyMachineAccess(userId: string, role?: string | null): boo
   return hasFeature(userId, "money_machine", role);
 }
 
-// ── Demo scope (cho mentor + admin view) ──
-const DEMO_USER_IDS = [
-  "u-student-001",
-  "u-student-002",
-  "u-student-003",
-  "u-student-004",
-  "u-student-005",
-];
+// ── Scope cho mentor/admin view ──
+// Scope thật (mentee của mentor / mọi khách của admin) được layout resolve từ
+// cloud (resolveScopeUserIds) rồi lưu localStorage qua setResolvedScope().
+// getUserScope đọc lại sync khi render. Không còn user demo hard-code.
+const SCOPE_STORAGE_KEY = "rova_comay_scope_v1";
 
-const DEMO_MENTEE_BY_MENTOR: Record<string, string[]> = {
-  "u-mentor-001": ["u-student-001", "u-student-002", "u-student-003"],
-  "u-mentor-002": ["u-student-004", "u-student-005"],
-};
+export function setResolvedScope(viewerId: string, ids: string[]): void {
+  if (!isBrowser()) return;
+  try {
+    const all = JSON.parse(window.localStorage.getItem(SCOPE_STORAGE_KEY) || "{}");
+    all[viewerId] = ids;
+    window.localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // quota / private mode — non-fatal
+  }
+}
+
+function getResolvedScope(viewerId: string): string[] | null {
+  if (!isBrowser()) return null;
+  try {
+    const all = JSON.parse(window.localStorage.getItem(SCOPE_STORAGE_KEY) || "{}");
+    const ids = (all as Record<string, unknown>)[viewerId];
+    return Array.isArray(ids) ? (ids as string[]) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function getUserScope(role: string | undefined | null, userId: string): string[] {
-  if (role === "admin" || userId.startsWith("u-admin")) return DEMO_USER_IDS;
-  if (role === "mentor" || userId.startsWith("u-mentor")) {
-    return DEMO_MENTEE_BY_MENTOR[userId] ?? DEMO_USER_IDS.slice(0, 3);
-  }
-  // Fallback: any other id → treat as own scope. Add to demo seeded users
-  // for stable mock data when arbitrary Supabase profile ids appear.
-  return [userId];
+  // Trang khách (client) chỉ xem cỗ máy của chính mình.
+  if (role === "client" || !role) return [userId];
+  // Trang mentor/admin: dùng scope thật do layout resolve từ cloud (mentee/mọi
+  // khách). Chưa resolve xong → fallback chính mình để không hiển thị dữ liệu sai.
+  return getResolvedScope(userId) ?? [userId];
 }
 
 export function getMachinesForScope(userIds: string[]): Machine[] {

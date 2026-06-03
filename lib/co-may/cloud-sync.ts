@@ -285,6 +285,62 @@ export async function hydrateFromCloud(userId: string): Promise<void> {
   }
 }
 
+// ── Aggregate (mentor/admin): resolve scope thật + hydrate nhiều user ──
+
+/**
+ * Trả về danh sách user_id thuộc phạm vi xem của mentor/admin.
+ * - admin/super_admin → tất cả khách có cỗ máy (distinct user_id trong comay_machines)
+ * - mentor → các mentee thật (profiles.mentor_id = viewerId)
+ */
+export async function resolveScopeUserIds(
+  viewerId: string,
+  role: string | null | undefined,
+): Promise<string[]> {
+  if (role === "admin" || role === "super_admin") {
+    const { data } = await supabase.from("comay_machines").select("user_id");
+    return Array.from(
+      new Set((data ?? []).map((r) => (r as { user_id: string }).user_id)),
+    );
+  }
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("mentor_id", viewerId);
+  return (data ?? []).map((r) => (r as { id: string }).id);
+}
+
+/**
+ * Hydrate localStorage cho NHIỀU user trong 1 lượt (batched `.in()`).
+ * Dùng cho mentor/admin aggregate view — sau đó các fn read sync trong
+ * mock-data.ts (getMachinesForScope…) hoạt động bình thường.
+ */
+export async function hydrateManyFromCloud(userIds: string[]): Promise<void> {
+  if (!userIds.length || typeof window === "undefined") return;
+  try {
+    const [machinesRes, txRes, reportsRes] = await Promise.all([
+      supabase.from("comay_machines").select("*").in("user_id", userIds),
+      supabase.from("comay_transactions").select("*").in("user_id", userIds),
+      supabase.from("comay_reports").select("*").in("user_id", userIds),
+    ]);
+    const machines = (machinesRes.data ?? []).map(toMachine);
+    const tx = (txRes.data ?? []).map(toTx);
+    const reports = (reportsRes.data ?? []).map(toReport);
+    const dataAll = JSON.parse(
+      window.localStorage.getItem("rova_comay_data_v1") || "{}",
+    );
+    for (const id of userIds) {
+      dataAll[id] = {
+        machines: machines.filter((m) => m.user_id === id),
+        tx: tx.filter((t) => t.user_id === id),
+        reports: reports.filter((r) => r.user_id === id),
+      };
+    }
+    window.localStorage.setItem("rova_comay_data_v1", JSON.stringify(dataAll));
+  } catch (err) {
+    console.error("[cloud-sync] hydrateManyFromCloud failed:", err);
+  }
+}
+
 // ── PUSH: fire-and-forget mutations to Supabase ──
 function fire<T>(p: PromiseLike<T>): void {
   Promise.resolve(p).then(

@@ -3,8 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/lib/auth";
-import { invalidateLocalCache } from "@/lib/co-may/mock-data";
-import { hydrateFromCloud } from "@/lib/co-may/cloud-sync";
+import { invalidateLocalCache, setResolvedScope } from "@/lib/co-may/mock-data";
+import {
+  hydrateFromCloud,
+  hydrateManyFromCloud,
+  resolveScopeUserIds,
+} from "@/lib/co-may/cloud-sync";
 import { getAccessStatus, touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
 
@@ -31,8 +35,18 @@ export default function MentorCoMayLayout({
           return;
         }
       }
+      // Resolve scope THẬT (mentee của mentor / mọi khách của admin) rồi nạp
+      // toàn bộ dữ liệu của họ từ cloud. Chạy tuần tự (không Promise.all) để
+      // tránh 2 lượt ghi localStorage rova_comay_data_v1 đè lên nhau.
+      const scopeIds = await resolveScopeUserIds(user.id, user.role);
+      if (cancelled) return;
       await hydrateFromCloud(user.id);
+      if (cancelled) return;
+      await hydrateManyFromCloud(scopeIds);
+      if (cancelled) return;
+      setResolvedScope(user.id, scopeIds);
       invalidateLocalCache(user.id);
+      scopeIds.forEach(invalidateLocalCache);
       touchLastSeen(user.id, "comay");
       if (!cancelled) setHydrated(user.id);
     })();
