@@ -2,6 +2,7 @@
 // phép đọc chéo user — cần cho leaderboard). Không đi qua localStorage per-user.
 
 import { supabase } from "@/lib/supabase";
+import { USC_PER_USD } from "./currency";
 import type {
   CurrencyUnit,
   LeaderboardEntry,
@@ -145,15 +146,27 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
     supabase.from("profiles").select("id, full_name").in("id", userIds),
   ]);
 
-  // Lệnh MT5 đã đóng của tất cả account liên quan (guard tránh .in([]) rỗng).
+  // Lệnh MT5 đã đóng + currency thật của account (guard tránh .in([]) rỗng).
+  // currency = "USC" → tài khoản cent: EA ghi profit thô theo CENT (xem
+  // MT5SupabaseSync.mq5 ghi DEAL_PROFIT không quy đổi) → phải chia 100 về USD.
   let tradeRows: Mt5TradeRow[] = [];
+  const centByAccount = new Map<string, boolean>();
   if (accountIds.length > 0) {
-    const { data } = await supabase
-      .from("mt5_trades")
-      .select("mt5_account_id, profit, swap, commission, volume, time_close")
-      .in("mt5_account_id", accountIds)
-      .eq("is_closed", true);
-    tradeRows = (data ?? []) as Mt5TradeRow[];
+    const [tradesR, statesR] = await Promise.all([
+      supabase
+        .from("mt5_trades")
+        .select("mt5_account_id, profit, swap, commission, volume, time_close")
+        .in("mt5_account_id", accountIds)
+        .eq("is_closed", true),
+      supabase
+        .from("mt5_account_states")
+        .select("mt5_account_id, currency")
+        .in("mt5_account_id", accountIds),
+    ]);
+    tradeRows = (tradesR.data ?? []) as Mt5TradeRow[];
+    for (const s of (statesR.data ?? []) as { mt5_account_id: string; currency: string | null }[]) {
+      centByAccount.set(s.mt5_account_id, String(s.currency ?? "").toUpperCase() === "USC");
+    }
   }
 
   const machineById = new Map(
@@ -184,13 +197,19 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
     // Fallback baseline_balance chỉ khi thiếu capital.
     const denom = Number(m?.capital) || Number(r.baseline_balance ?? 0) || 0;
 
+    // Tài khoản cent (USC) → MT5 báo tiền theo CENT; quy về USD canonical (chia 100)
+    // để khớp capital. Ưu tiên currency thật từ broker, fallback currency_unit của máy.
+    const machineIsCent = String(m?.currency_unit ?? "").toUpperCase() === "USC";
+    const isCent = accountId ? centByAccount.get(accountId) ?? machineIsCent : machineIsCent;
+    const moneyFactor = isCent ? 1 / USC_PER_USD : 1;
+
     // Chỉ lệnh ĐÃ ĐÓNG trong cửa sổ giải [baseline_at, end_date].
     const trades = (accountId ? tradesByAccount.get(accountId) ?? [] : []).filter((t) => {
       if (!t.time_close) return false;
       const ts = new Date(t.time_close).getTime();
       return ts >= baselineAt && ts <= endMs;
     });
-    const pnl = trades.reduce((s, t) => s + pnlOf(t), 0);
+    const pnl = trades.reduce((s, t) => s + pnlOf(t) * moneyFactor, 0);
     const tradeCount = trades.length;
     const wins = trades.filter((t) => pnlOf(t) > 0).length;
     const winRate = tradeCount > 0 ? wins / tradeCount : 0;
