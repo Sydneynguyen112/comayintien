@@ -13,6 +13,8 @@ import {
   getUserScope,
 } from "@/lib/co-may/mock-data";
 import { adjustTotalCapital, getSetup } from "@/lib/co-may/setup-store";
+import { moveMt5ToMachine, unlinkMt5FromMachine } from "@/lib/co-may/mt5-actions";
+import { pushMachineNow } from "@/lib/co-may/cloud-sync";
 import { cn } from "@/lib/utils";
 import type {
   CycleDecision,
@@ -160,7 +162,7 @@ export function CloseCycleWizard({
     setStep((s) => Math.max(1, s - 1));
   }
 
-  function submit() {
+  async function submit() {
     if (!decision || submitting) return;
     setSubmitting(true);
     const nextCapital = decision === "scale" ? computedScaleCapital : undefined;
@@ -206,6 +208,22 @@ export function CloseCycleWizard({
     const currentTotal = setupBefore?.totalCapital ?? 0;
     const adjustment = targetTotal - currentTotal;
     if (adjustment !== 0) adjustTotalCapital(resolvedOwner, adjustment);
+
+    // ── MT5: giữ quy ước 1 MT5 ↔ 1 cỗ máy đang mở ──
+    //  - Đóng hẳn: ngắt MT5 khỏi máy (giữ account + lịch sử, giải phóng login để add máy khác).
+    //  - Scale/Reset: chuyển MT5 sang máy mới tiếp nối (khách khỏi phải kết nối lại).
+    try {
+      if (decision === "close") {
+        await unlinkMt5FromMachine(machineId);
+      } else if (result.nextMachineId) {
+        const newM = getMachineById(resolvedOwner, result.nextMachineId);
+        if (newM) await pushMachineNow(resolvedOwner, newM); // chắc máy mới đã lên cloud (thoả FK)
+        await moveMt5ToMachine(machineId, result.nextMachineId);
+      }
+    } catch (e) {
+      // Không chặn flow đóng chu kỳ nếu thao tác MT5 lỗi — chỉ log.
+      console.error("[co-may] Xử lý MT5 khi đóng chu kỳ lỗi:", e);
+    }
 
     router.push(`/${role}/co-may/bao-cao/${result.report.id}?owner=${resolvedOwner}`);
   }

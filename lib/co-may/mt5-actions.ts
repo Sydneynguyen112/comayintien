@@ -169,10 +169,10 @@ export async function linkMt5ToMachine(input: Mt5LinkInput): Promise<Mt5LinkResu
     // 23505 = UNIQUE violation. 23503 = FK violation. 22P02 = invalid input syntax (vd UUID vs TEXT).
     const code = accountRes.error.code;
     if (code === "23505") {
-      return {
-        success: false,
-        error: `Account MT5 ${input.login}@${input.server} đã được link trước đó (UNIQUE constraint).`,
-      };
+      // Account login@server đã tồn tại. Nếu nó KHÔNG còn gắn cỗ máy đang mở
+      // (vd máy cũ đã đóng/ngắt) → TÁI SỬ DỤNG account cũ (giữ nguyên lịch sử
+      // lệnh đã sync) + gắn sang máy mới. Nếu đang gắn 1 máy mở khác → báo lỗi.
+      return await reclaimMt5Account(sb, machineRes.data.user_id, input, encryptedPassword);
     }
     return {
       success: false,
@@ -304,4 +304,134 @@ export async function getMt5DecryptedPassword(accountId: string): Promise<{
   } catch (e) {
     return { success: false, error: `Decrypt fail: ${(e as Error).message}` };
   }
+}
+
+/**
+ * TÁI SỬ DỤNG 1 MT5 account đã tồn tại (login@server UNIQUE) cho cỗ máy mới.
+ * Gọi khi linkMt5ToMachine gặp 23505. Quy ước: 1 MT5 ↔ 1 cỗ máy đang mở.
+ *   - Nếu account còn gắn 1 cỗ máy ĐANG MỞ → từ chối (đang dùng chỗ khác).
+ *   - Nếu chỉ gắn máy đã đóng / mồ côi → gỡ link cũ, cập nhật creds + chủ sở hữu,
+ *     reset status='pending' để daemon sync lại, rồi gắn sang máy mới.
+ * Lịch sử lệnh (mt5_trades/mt5_transactions) được GIỮ NGUYÊN.
+ */
+async function reclaimMt5Account(
+  sb: ReturnType<typeof serviceClient>,
+  userId: string,
+  input: Mt5LinkInput,
+  encryptedPassword: string,
+): Promise<Mt5LinkResult> {
+  const login = input.login.trim();
+  const server = input.server.trim();
+
+  const accRes = await sb
+    .from("mt5_accounts")
+    .select("id")
+    .eq("login", login)
+    .eq("server", server)
+    .maybeSingle();
+  if (accRes.error || !accRes.data) {
+    return {
+      success: false,
+      error: `Account ${login}@${server} đã tồn tại nhưng không đọc lại được để tái sử dụng${accRes.error ? `: ${accRes.error.message}` : ""}.`,
+    };
+  }
+  const accId = accRes.data.id as string;
+
+  // Account còn gắn cỗ máy ĐANG MỞ không?
+  const linkRes = await sb
+    .from("mt5_machine_links")
+    .select("machine_id")
+    .eq("mt5_account_id", accId);
+  const linkedIds = (linkRes.data ?? []).map((l) => (l as { machine_id: string }).machine_id);
+  if (linkedIds.length > 0) {
+    const mRes = await sb.from("comay_machines").select("id, status").in("id", linkedIds);
+    const hasOpen = (mRes.data ?? []).some((m) => (m as { status: string }).status !== "closed");
+    if (hasOpen) {
+      return {
+        success: false,
+        error: `Account ${login}@${server} đang được dùng cho một cỗ máy khác đang mở. Hãy đóng hoặc ngắt MT5 ở cỗ máy đó trước.`,
+      };
+    }
+    // Chỉ gắn với máy đã đóng / mồ côi → gỡ link cũ để tái sử dụng.
+    await sb.from("mt5_machine_links").delete().eq("mt5_account_id", accId);
+  }
+
+  const upd = await sb
+    .from("mt5_accounts")
+    .update({
+      user_id: userId,
+      encrypted_password: encryptedPassword,
+      server,
+      broker_name: server.split("-")[0] || null,
+      status: "pending",
+      last_error: null,
+      last_synced_at: null,
+    })
+    .eq("id", accId);
+  if (upd.error) {
+    return { success: false, error: `Cập nhật account (reclaim) fail: ${upd.error.message}` };
+  }
+
+  const linkIns = await sb.from("mt5_machine_links").insert({
+    mt5_account_id: accId,
+    machine_id: input.machineId,
+    is_primary: true,
+  });
+  if (linkIns.error) {
+    const code = linkIns.error.code;
+    if (code === "22P02") {
+      return {
+        success: false,
+        error:
+          "Insert mt5_machine_links fail: cột machine_id cần kiểu TEXT. Chạy supabase-mt5-fix-machine-id-type.sql.",
+      };
+    }
+    return { success: false, error: `Gắn link (reclaim) fail [code=${code}]: ${linkIns.error.message}` };
+  }
+  return { success: true, mt5AccountId: accId };
+}
+
+/**
+ * Ngắt MT5 khỏi 1 cỗ máy (khi ĐÓNG hẳn hoặc XOÁ máy) — GỠ LINK, GIỮ account +
+ * lịch sử lệnh. Login@server được giải phóng để add sang cỗ máy khác
+ * (linkMt5ToMachine sẽ reclaim account cũ). No-op nếu máy chưa link MT5.
+ */
+export async function unlinkMt5FromMachine(
+  machineId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const sb = serviceClient();
+  const res = await sb.from("mt5_machine_links").delete().eq("machine_id", machineId);
+  if (res.error) return { success: false, error: res.error.message };
+  return { success: true };
+}
+
+/**
+ * Chuyển MT5 từ cỗ máy cũ sang cỗ máy mới (dùng cho scale/reset — máy mới tiếp
+ * nối). Re-point mt5_machine_links.machine_id. Máy mới PHẢI đã có trên
+ * comay_machines (gọi pushMachineNow trước để thoả FK). No-op nếu máy cũ chưa link.
+ */
+export async function moveMt5ToMachine(
+  fromMachineId: string,
+  toMachineId: string,
+): Promise<{ success: boolean; moved: boolean; error?: string }> {
+  const sb = serviceClient();
+  const linkRes = await sb
+    .from("mt5_machine_links")
+    .select("mt5_account_id")
+    .eq("machine_id", fromMachineId)
+    .maybeSingle();
+  if (linkRes.error) return { success: false, moved: false, error: linkRes.error.message };
+  if (!linkRes.data) return { success: true, moved: false };
+
+  const upd = await sb
+    .from("mt5_machine_links")
+    .update({ machine_id: toMachineId })
+    .eq("machine_id", fromMachineId);
+  if (upd.error) {
+    if (upd.error.code === "23505") {
+      return { success: false, moved: false, error: "Cỗ máy mới đã có MT5 link sẵn." };
+    }
+    return { success: false, moved: false, error: upd.error.message };
+  }
+  return { success: true, moved: true };
 }

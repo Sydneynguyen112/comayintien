@@ -33,6 +33,7 @@ import {
   recordTransaction,
   updateMachine,
 } from "@/lib/co-may/mock-data";
+import { unlinkMt5FromMachine } from "@/lib/co-may/mt5-actions";
 import { fireworksGrand, FIREWORK_GRAND_DURATION } from "@/lib/co-may/celebrate";
 import { cn } from "@/lib/utils";
 import type { Machine, MachineTransaction } from "@/lib/co-may/types";
@@ -164,7 +165,14 @@ export function MachineDetailView({
 
   const readOnly = role !== "client" || resolvedOwner !== user.id;
 
-  function handleDelete() {
+  async function handleDelete() {
+    // Gỡ MT5 trước (giữ account + lịch sử, giải phóng login@server để add máy khác)
+    // — gỡ trước khi xoá comay_machines để tránh vướng FK của mt5_machine_links.
+    try {
+      await unlinkMt5FromMachine(machineId);
+    } catch (e) {
+      console.error("[co-may] Ngắt MT5 khi xoá máy lỗi:", e);
+    }
     // Xoá máy → vốn (capital) tự quay về vốn dự trữ vì reserve = totalCapital − Σ(vốn máy đang mở).
     // deleteMachine cũng xoá toàn bộ tx + reports = xoá hết lãi/lỗ của máy.
     deleteMachine(resolvedOwner, machineId);
