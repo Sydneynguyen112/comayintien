@@ -6,6 +6,7 @@ import { useCurrentUser } from "@/lib/auth";
 import { touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
 import { RealtimeAdminProvider } from "@/components/providers/realtime-admin-provider";
+import { Mt5SyncAlert } from "@/components/admin/mt5-sync-alert";
 
 export default function AdminLayout({
   children,
@@ -33,7 +34,14 @@ export default function AdminLayout({
   }
   return (
     <RealtimeAdminProvider>
-      <CoMayShell role="admin">{children}</CoMayShell>
+      <CoMayShell role="admin">
+        {/* Cảnh báo toàn cục: chỉ hiện khi MT5 ngừng/chậm đồng bộ (ẩn lúc bình thường;
+            empty:hidden để không chừa khoảng trống khi banner null). */}
+        <div className="mb-4 empty:hidden">
+          <Mt5SyncAlert hideWhenOk />
+        </div>
+        {children}
+      </CoMayShell>
     </RealtimeAdminProvider>
   );
 }
