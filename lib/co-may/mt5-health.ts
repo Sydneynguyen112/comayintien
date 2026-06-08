@@ -2,8 +2,13 @@
 // Thuần, không I/O — nhận dữ liệu đã fetch, trả về cờ vấn đề + mức độ + số liệu đã
 // quy đổi USD. Tách riêng để dễ chỉnh ngưỡng và test.
 //
-// Lưu ý tiền tệ: TK cent (currency='USC') có balance/equity/profit theo CENT thô
-// (xem [[mt5-cent-currency]]); chia 100 để về USD canonical cho khớp capital.
+// QUAN TRỌNG — đánh giá theo PnL THẬT, không theo equity-vs-vốn:
+//   Khách có thể RÚT tiền (kể cả rút lãi) → equity tụt xuống nhưng KHÔNG phải cháy.
+//   PnL = Equity hiện tại + Tiền đã RÚT − Tiền đã BỎ VÀO.
+//   (Tiền bỏ vào = tổng nạp thật nếu có; nếu chưa sync nạp thì fallback vốn gốc cỗ máy.)
+//
+// Lưu ý tiền tệ: TK cent (currency='USC') có balance/equity/profit/nạp/rút theo CENT
+// thô (xem [[mt5-cent-currency]]); chia 100 để về USD canonical.
 
 import { USC_PER_USD } from "./currency";
 
@@ -26,8 +31,11 @@ export interface AccountHealthInput {
   marginLevel: number | null;
   profit: number | null; // floating P/L (đơn vị tài khoản)
   positionsCount: number | null;
+  // mt5_transactions (tổng theo đơn vị tài khoản)
+  depositsRaw: number; // tổng nạp
+  withdrawalsRaw: number; // tổng rút
   // comay_machines
-  capitalUsd: number | null; // vốn gốc (USD canonical)
+  capitalUsd: number | null; // vốn gốc (USD canonical) — fallback "tiền bỏ vào"
   machineCurrencyUnit: string | null; // fallback xác định cent nếu state thiếu currency
   // mt5_trades
   lastTradeAt: string | null; // max(time_close) của lệnh đã đóng
@@ -42,7 +50,11 @@ export interface AccountHealth {
   equityUsd: number | null;
   balanceUsd: number | null;
   floatingUsd: number | null;
-  drawdownPct: number | null; // (equity − vốn)/vốn × 100 (âm = đang lỗ)
+  depositsUsd: number;
+  withdrawalsUsd: number;
+  investedUsd: number | null; // tiền bỏ vào (nạp thật hoặc fallback vốn gốc)
+  pnlUsd: number | null; // lãi/lỗ thật = equity + đã rút − tiền bỏ vào
+  pnlPct: number | null; // pnl / tiền bỏ vào × 100 (âm = lỗ)
   marginLevel: number | null;
   lastTradeDays: number | null;
   syncStaleMin: number | null;
@@ -50,8 +62,8 @@ export interface AccountHealth {
 
 // Ngưỡng — export để chỉnh nhanh ở 1 chỗ.
 export const HEALTH_THRESHOLDS = {
-  blownPct: 10, // equity ≤ 10% vốn → cháy TK
-  drawdownPct: 60, // equity ≤ 60% vốn → drawdown lớn
+  blownPnlPct: -90, // PnL ≤ −90% tiền bỏ vào → cháy TK (mất gần hết)
+  bigLossPnlPct: -40, // PnL ≤ −40% → lỗ nặng
   marginCallLevel: 150, // có lệnh mở & margin_level < 150% → sắp margin call
   floatingLossPct: 20, // floating P/L < −20% balance → gồng lỗ trôi nổi
   stoppedTradeDays: 7, // > 7 ngày không có lệnh đóng → ngừng trade
@@ -74,10 +86,19 @@ export function computeAccountHealth(inp: AccountHealthInput): AccountHealth {
   const equityUsd = inp.equity != null ? inp.equity * conv : null;
   const balanceUsd = inp.balance != null ? inp.balance * conv : null;
   const floatingUsd = inp.profit != null ? inp.profit * conv : null;
+  const depositsUsd = inp.depositsRaw * conv;
+  const withdrawalsUsd = inp.withdrawalsRaw * conv;
   const capital = inp.capitalUsd && inp.capitalUsd > 0 ? inp.capitalUsd : null;
 
-  const drawdownPct =
-    capital != null && equityUsd != null ? ((equityUsd - capital) / capital) * 100 : null;
+  // Tiền đã bỏ vào: ưu tiên tổng nạp THẬT; nếu chưa sync nạp (=0) thì fallback vốn gốc.
+  const investedUsd = depositsUsd > 0 ? depositsUsd : capital;
+
+  // PnL THẬT = equity hiện tại + đã rút − tiền bỏ vào. Cộng lại đã rút để equity
+  // thấp do RÚT tiền không bị hiểu nhầm thành cháy/lỗ.
+  const pnlUsd =
+    equityUsd != null && investedUsd != null ? equityUsd + withdrawalsUsd - investedUsd : null;
+  const pnlPct =
+    pnlUsd != null && investedUsd != null && investedUsd > 0 ? (pnlUsd / investedUsd) * 100 : null;
 
   const lastTradeDays =
     inp.lastTradeAt != null
@@ -97,12 +118,12 @@ export function computeAccountHealth(inp: AccountHealthInput): AccountHealth {
     flags.push({ key: "sync_error", severity: "critical", label: "Sync lỗi" });
   }
 
-  // ── Cháy TK / Drawdown lớn (loại trừ nhau: cháy thì không gắn thêm drawdown) ──
-  if (capital != null && equityUsd != null) {
-    if (equityUsd <= capital * (T.blownPct / 100)) {
+  // ── Cháy TK / Lỗ nặng theo PnL THẬT (loại trừ nhau) ──
+  if (pnlPct != null) {
+    if (pnlPct <= T.blownPnlPct) {
       flags.push({ key: "blown", severity: "critical", label: "Cháy TK" });
-    } else if (equityUsd <= capital * (T.drawdownPct / 100)) {
-      flags.push({ key: "drawdown", severity: "warning", label: "Drawdown lớn" });
+    } else if (pnlPct <= T.bigLossPnlPct) {
+      flags.push({ key: "big_loss", severity: "warning", label: "Lỗ nặng" });
     }
   }
 
@@ -117,7 +138,7 @@ export function computeAccountHealth(inp: AccountHealthInput): AccountHealth {
     flags.push({ key: "margin_call", severity: "critical", label: "Sắp margin call" });
   }
 
-  // ── Gồng lỗ trôi nổi lớn ──
+  // ── Gồng lỗ trôi nổi lớn (lệnh đang mở lỗ nặng) ──
   if (
     balanceUsd != null &&
     balanceUsd > 0 &&
@@ -150,20 +171,24 @@ export function computeAccountHealth(inp: AccountHealthInput): AccountHealth {
     equityUsd,
     balanceUsd,
     floatingUsd,
-    drawdownPct,
+    depositsUsd,
+    withdrawalsUsd,
+    investedUsd,
+    pnlUsd,
+    pnlPct,
     marginLevel: inp.marginLevel,
     lastTradeDays,
     syncStaleMin,
   };
 }
 
-/** So sánh để xếp nặng-nhất-lên-đầu: severity → drawdown (lỗ sâu trước) → nhiều cờ. */
+/** So sánh để xếp nặng-nhất-lên-đầu: severity → PnL% (lỗ sâu trước) → nhiều cờ. */
 export function compareHealth(a: AccountHealth, b: AccountHealth): number {
   if (SEV_RANK[a.severity] !== SEV_RANK[b.severity]) {
     return SEV_RANK[a.severity] - SEV_RANK[b.severity];
   }
-  const da = a.drawdownPct ?? 0;
-  const db = b.drawdownPct ?? 0;
-  if (da !== db) return da - db; // âm hơn (lỗ sâu hơn) lên trước
+  const pa = a.pnlPct ?? 0;
+  const pb = b.pnlPct ?? 0;
+  if (pa !== pb) return pa - pb; // âm hơn (lỗ sâu hơn) lên trước
   return b.flags.length - a.flags.length;
 }

@@ -63,8 +63,8 @@ export function Mt5HealthView() {
     const accountIds = Array.from(new Set(links.map((l) => l.mt5_account_id)));
     const machineIds = Array.from(new Set(links.map((l) => l.machine_id)));
 
-    // 2. Account + state + machine song song.
-    const [accRes, stateRes, machineRes] = await Promise.all([
+    // 2. Account + state + machine + nạp/rút song song.
+    const [accRes, stateRes, machineRes, txRes] = await Promise.all([
       supabase
         .from("mt5_accounts")
         .select("id, login, server, nickname, status, last_synced_at")
@@ -77,7 +77,23 @@ export function Mt5HealthView() {
         .from("comay_machines")
         .select("id, name, capital, currency_unit, user_id")
         .in("id", machineIds),
+      supabase
+        .from("mt5_transactions")
+        .select("mt5_account_id, type, amount")
+        .in("mt5_account_id", accountIds),
     ]);
+
+    // Tổng nạp / rút theo từng account (amount luôn dương, type phân biệt chiều).
+    const depByAcc = new Map<string, number>();
+    const wdByAcc = new Map<string, number>();
+    for (const t of (txRes.data ?? []) as { mt5_account_id: string; type: string; amount: number }[]) {
+      const amt = Math.abs(Number(t.amount) || 0);
+      if (t.type === "deposit") {
+        depByAcc.set(t.mt5_account_id, (depByAcc.get(t.mt5_account_id) ?? 0) + amt);
+      } else if (t.type === "withdrawal") {
+        wdByAcc.set(t.mt5_account_id, (wdByAcc.get(t.mt5_account_id) ?? 0) + amt);
+      }
+    }
 
     const accById = new Map(
       ((accRes.data ?? []) as Record<string, unknown>[]).map((a) => [a.id as string, a]),
@@ -142,6 +158,8 @@ export function Mt5HealthView() {
         marginLevel: (st?.margin_level as number | null) ?? null,
         profit: (st?.profit as number | null) ?? null,
         positionsCount: (st?.positions_count as number | null) ?? null,
+        depositsRaw: depByAcc.get(link.mt5_account_id) ?? 0,
+        withdrawalsRaw: wdByAcc.get(link.mt5_account_id) ?? 0,
         capitalUsd: (machine?.capital as number | null) ?? null,
         machineCurrencyUnit: (machine?.currency_unit as string | null) ?? null,
         lastTradeAt: lastTradeByAcc.get(link.mt5_account_id) ?? null,
@@ -254,14 +272,18 @@ function HealthCard({ row }: { row: HealthRow }) {
   const { health: h } = row;
   const meta = SEV_META[h.severity];
   const Icon = meta.icon;
-  const ddTone =
-    h.drawdownPct == null
+  const pnlTone =
+    h.pnlPct == null
       ? "text-muted-foreground"
-      : h.drawdownPct <= -40
+      : h.pnlPct <= -40
         ? "text-red-600 dark:text-red-400"
-        : h.drawdownPct < 0
+        : h.pnlPct < 0
           ? "text-amber-600 dark:text-amber-400"
           : "text-emerald-600 dark:text-emerald-400";
+  const pnlText =
+    h.pnlUsd == null
+      ? "—"
+      : `${fmtUsd(h.pnlUsd, true)}${h.pnlPct != null ? ` · ${h.pnlPct >= 0 ? "+" : ""}${h.pnlPct.toFixed(0)}%` : ""}`;
 
   return (
     <div className={cn("rounded-xl border p-3.5 space-y-2.5", meta.tone)}>
@@ -313,25 +335,15 @@ function HealthCard({ row }: { row: HealthRow }) {
         )}
       </div>
 
-      {/* Số liệu */}
+      {/* Số liệu — PnL THẬT (đã cộng lại đã rút), kèm nạp/rút để giải thích equity */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-x-3 gap-y-2 text-xs">
-        <Metric label="Vốn gốc" value={fmtUsd(row.capitalUsd)} />
         <Metric label="Equity" value={fmtUsd(h.equityUsd)} />
+        <Metric label="PnL thật" value={pnlText} tone={pnlTone} />
+        <Metric label="Đã nạp" value={fmtUsd(h.depositsUsd)} />
         <Metric
-          label="Drawdown"
-          value={h.drawdownPct == null ? "—" : `${h.drawdownPct >= 0 ? "+" : ""}${h.drawdownPct.toFixed(1)}%`}
-          tone={ddTone}
-        />
-        <Metric
-          label="Floating"
-          value={fmtUsd(h.floatingUsd, true)}
-          tone={
-            h.floatingUsd == null
-              ? undefined
-              : h.floatingUsd < 0
-                ? "text-red-600 dark:text-red-400"
-                : "text-emerald-600 dark:text-emerald-400"
-          }
+          label="Đã rút"
+          value={fmtUsd(h.withdrawalsUsd)}
+          tone={h.withdrawalsUsd > 0 ? "text-primary" : undefined}
         />
         <Metric
           label="Margin level"
