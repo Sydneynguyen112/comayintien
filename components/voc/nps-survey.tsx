@@ -91,7 +91,7 @@ export function NpsSurvey() {
             <span className="text-sm font-semibold text-foreground">Bạn đánh giá Cỗ Máy thế nào?</span>
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            Khả năng bạn sẽ giới thiệu Cỗ Máy In Tiền cho bạn bè trader?
+            Khả năng bạn sẽ giới thiệu Cỗ Máy Trading cho bạn bè trader?
           </p>
           <div className="flex flex-wrap gap-1 mb-3">
             {Array.from({ length: 11 }, (_, i) => i).map((n) => (

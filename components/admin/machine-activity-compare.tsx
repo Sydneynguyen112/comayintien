@@ -202,7 +202,7 @@ export function MachineActivityCompare({ machineId, mt5AccountId, daysBack: init
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <StatBox
           title="KHÁCH TỰ NHẬP"
-          subtitle="Co Máy In Tiền"
+          subtitle="Cỗ Máy Trading"
           accent="border-blue-500/30 bg-blue-500/5"
           titleTone="text-blue-700 dark:text-blue-300"
           stats={[

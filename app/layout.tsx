@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cỗ Máy In Tiền — Quản trị kỷ luật rút tiền",
+  title: "Cỗ Máy Trading — Quản trị kỷ luật rút tiền",
   description:
     "Tool quản trị kỷ luật rút tiền cho trader: KPI, anchor, withdraw celebration, báo cáo chu kỳ.",
 };

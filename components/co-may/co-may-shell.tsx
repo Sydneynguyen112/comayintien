@@ -34,7 +34,7 @@ export function CoMayShell({
         </div>
         <div className="flex-1 min-w-0">
           <h1 className={cn(seniorCx.pageTitle(senior), "gold-gradient-text leading-tight")}>
-            Cỗ Máy In Tiền
+            Cỗ Máy Trading
           </h1>
           <p className={cn(seniorCx.pageSubtitle(senior), "mt-1")}>
             {ROLE_LABEL[role]} — quản trị kỷ luật rút tiền cho trader

@@ -63,8 +63,8 @@ export default function PendingPage() {
           </h1>
           <p className="mt-2 text-muted-foreground text-sm leading-relaxed">
             {isLocked
-              ? "Quyền truy cập Cỗ Máy In Tiền của bạn đã bị admin thu hồi. Liên hệ admin nếu cần hỗ trợ."
-              : "Tài khoản của bạn đã được tạo. Admin sẽ review và mở quyền truy cập Cỗ Máy In Tiền trong thời gian sớm nhất."}
+              ? "Quyền truy cập Cỗ Máy Trading của bạn đã bị admin thu hồi. Liên hệ admin nếu cần hỗ trợ."
+              : "Tài khoản của bạn đã được tạo. Admin sẽ review và mở quyền truy cập Cỗ Máy Trading trong thời gian sớm nhất."}
           </p>
         </div>
 

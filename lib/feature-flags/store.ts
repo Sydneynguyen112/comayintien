@@ -20,7 +20,7 @@ export interface FeatureDefinition {
 export const FEATURES: FeatureDefinition[] = [
   {
     id: "money_machine",
-    label: "Cỗ Máy In Tiền",
+    label: "Cỗ Máy Trading",
     description:
       "Module quản trị kỷ luật rút tiền — KPI, matrix hiệu suất, anchor, withdraw celebration, báo cáo chu kỳ.",
     icon: Coins,

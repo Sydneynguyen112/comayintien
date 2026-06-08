@@ -59,7 +59,7 @@ function SignInPageInner() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Đăng nhập</h1>
         <p className="mt-2 text-muted-foreground">
-          Chào mừng quay lại Cỗ Máy In Tiền
+          Chào mừng quay lại Cỗ Máy Trading
         </p>
       </div>
 
