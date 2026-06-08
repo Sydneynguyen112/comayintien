@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, BookText, CheckCircle2, ChevronDown, ChevronRight, Clock, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, BookText, CheckCircle2, ChevronDown, ChevronRight, Clock, HeartPulse, Trash2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCurrentUser } from "@/lib/auth";
 import { cn, formatDate } from "@/lib/utils";
@@ -134,6 +134,12 @@ export default function AdminMt5Page() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/admin/mt5/suc-khoe">
+              <Button variant="outline" size="sm">
+                <HeartPulse className="h-4 w-4" />
+                Sức khỏe khách hàng
+              </Button>
+            </Link>
             <Link href="/admin/mt5/danh-ba">
               <Button variant="outline" size="sm">
                 <BookText className="h-4 w-4" />
