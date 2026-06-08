@@ -7,6 +7,7 @@ import {
   ChartLine,
   Coins,
   Trophy,
+  HeartPulse,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -34,6 +35,7 @@ export const mentorNav: NavItem[] = clientMentorNav("mentor");
 export const adminNav: NavItem[] = [
   { href: "/admin/crm", label: "Dashboard", icon: ChartLine },
   { href: "/admin/khach-hang", label: "Quản lý cỗ máy", icon: Users },
+  { href: "/admin/mt5/suc-khoe", label: "Sức khỏe khách hàng", icon: HeartPulse },
   { href: "/admin/giai-dau", label: "Giải đấu", icon: Trophy },
   { href: "/client/co-may/tong-quan", label: "Cỗ máy cá nhân", icon: Coins },
   { href: "/admin/profile", label: "Hồ sơ", icon: User },
