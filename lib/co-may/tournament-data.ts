@@ -113,7 +113,11 @@ interface Mt5TradeRow {
  * Leaderboard tính động theo KẾT QUẢ MT5 THẬT (KHÔNG dùng log tay):
  *   registrations approved → cỗ máy → MT5 account (qua mt5_machine_links) →
  *   các lệnh ĐÃ ĐÓNG trong cửa sổ giải (time_close ∈ [baseline_at, end_date]).
- * PnL = Σ(profit + swap + commission); %tăng trưởng = PnL / vốn cỗ máy (USD canonical).
+ * PnL = Σ(profit + swap + commission) các lệnh trong cửa sổ giải.
+ * ROI (%tăng trưởng) = PnL / TỔNG TIỀN NẠP MT5 (mt5_transactions type=deposit),
+ *   khớp cách MT5 hiển thị "Lợi nhuận / Tiền nạp". Thiếu dữ liệu nạp thì fallback
+ *   vốn cỗ máy. PnL & tiền nạp cùng đơn vị tài khoản nên tỉ lệ tự triệt tiêu cent;
+ *   ta vẫn quy cả hai về USD canonical để fallback capital khớp đơn vị.
  * Máy chưa kết nối MT5 → không có dữ liệu thật → score 0, mt5_linked=false,
  * và luôn xếp dưới các máy đã kết nối.
  */
@@ -151,8 +155,10 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
   // MT5SupabaseSync.mq5 ghi DEAL_PROFIT không quy đổi) → phải chia 100 về USD.
   let tradeRows: Mt5TradeRow[] = [];
   const centByAccount = new Map<string, boolean>();
+  // Tổng tiền nạp THẬT theo account (mt5_transactions type=deposit, đơn vị tài khoản).
+  const depositRawByAccount = new Map<string, number>();
   if (accountIds.length > 0) {
-    const [tradesR, statesR] = await Promise.all([
+    const [tradesR, statesR, depositsR] = await Promise.all([
       supabase
         .from("mt5_trades")
         .select("mt5_account_id, profit, swap, commission, volume, time_close")
@@ -162,10 +168,21 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
         .from("mt5_account_states")
         .select("mt5_account_id, currency")
         .in("mt5_account_id", accountIds),
+      supabase
+        .from("mt5_transactions")
+        .select("mt5_account_id, amount")
+        .in("mt5_account_id", accountIds)
+        .eq("type", "deposit"),
     ]);
     tradeRows = (tradesR.data ?? []) as Mt5TradeRow[];
     for (const s of (statesR.data ?? []) as { mt5_account_id: string; currency: string | null }[]) {
       centByAccount.set(s.mt5_account_id, String(s.currency ?? "").toUpperCase() === "USC");
+    }
+    for (const d of (depositsR.data ?? []) as { mt5_account_id: string; amount: number | null }[]) {
+      depositRawByAccount.set(
+        d.mt5_account_id,
+        (depositRawByAccount.get(d.mt5_account_id) ?? 0) + (Number(d.amount) || 0),
+      );
     }
   }
 
@@ -193,15 +210,18 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
     const m = machineById.get(r.machine_id);
     const accountId = accountByMachine.get(r.machine_id) ?? null;
     const baselineAt = r.baseline_at ? new Date(r.baseline_at).getTime() : 0;
-    // Mẫu số = vốn cỗ máy thật (USD canonical), KHÔNG dùng số liệu log tay.
-    // Fallback baseline_balance chỉ khi thiếu capital.
-    const denom = Number(m?.capital) || Number(r.baseline_balance ?? 0) || 0;
 
-    // Tài khoản cent (USC) → MT5 báo tiền theo CENT; quy về USD canonical (chia 100)
-    // để khớp capital. Ưu tiên currency thật từ broker, fallback currency_unit của máy.
+    // Tài khoản cent (USC) → MT5 báo tiền theo CENT; quy về USD canonical (chia 100).
+    // Ưu tiên currency thật từ broker, fallback currency_unit của máy.
     const machineIsCent = String(m?.currency_unit ?? "").toUpperCase() === "USC";
     const isCent = accountId ? centByAccount.get(accountId) ?? machineIsCent : machineIsCent;
     const moneyFactor = isCent ? 1 / USC_PER_USD : 1;
+
+    // Mẫu số ROI = TỔNG TIỀN NẠP MT5 (quy USD canonical). Tiền nạp & PnL cùng đơn vị
+    // tài khoản nên ×moneyFactor triệt tiêu trong tỉ lệ; vẫn quy USD để fallback capital
+    // khớp đơn vị khi tài khoản chưa sync tiền nạp.
+    const depositUsd = (accountId ? depositRawByAccount.get(accountId) ?? 0 : 0) * moneyFactor;
+    const denom = depositUsd > 0 ? depositUsd : Number(m?.capital) || Number(r.baseline_balance ?? 0) || 0;
 
     // Chỉ lệnh ĐÃ ĐÓNG trong cửa sổ giải [baseline_at, end_date].
     const trades = (accountId ? tradesByAccount.get(accountId) ?? [] : []).filter((t) => {
