@@ -112,12 +112,13 @@ interface Mt5TradeRow {
 /**
  * Leaderboard tính động theo KẾT QUẢ MT5 THẬT (KHÔNG dùng log tay):
  *   registrations approved → cỗ máy → MT5 account (qua mt5_machine_links) →
- *   các lệnh ĐÃ ĐÓNG trong cửa sổ giải (time_close ∈ [baseline_at, end_date]).
- * PnL = Σ(profit + swap + commission) các lệnh trong cửa sổ giải.
+ *   TẤT CẢ các lệnh ĐÃ ĐÓNG của account (KHÔNG lọc theo cửa sổ giải).
+ * PnL = Σ(profit + swap + commission) toàn bộ lệnh đã đóng.
  * ROI (%tăng trưởng) = PnL / TỔNG TIỀN NẠP MT5 (mt5_transactions type=deposit),
- *   khớp cách MT5 hiển thị "Lợi nhuận / Tiền nạp". Thiếu dữ liệu nạp thì fallback
- *   vốn cỗ máy. PnL & tiền nạp cùng đơn vị tài khoản nên tỉ lệ tự triệt tiêu cent;
- *   ta vẫn quy cả hai về USD canonical để fallback capital khớp đơn vị.
+ *   khớp ĐÚNG cách MT5/màn "MT5 thực tế" hiển thị "Lợi nhuận / Tiền nạp" toàn bộ.
+ *   Thiếu dữ liệu nạp thì fallback vốn cỗ máy. PnL & tiền nạp cùng đơn vị tài khoản
+ *   nên tỉ lệ tự triệt tiêu cent; vẫn quy cả hai về USD canonical để fallback capital
+ *   khớp đơn vị.
  * Máy chưa kết nối MT5 → không có dữ liệu thật → score 0, mt5_linked=false,
  * và luôn xếp dưới các máy đã kết nối.
  */
@@ -201,15 +202,12 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
     tradesByAccount.set(t.mt5_account_id, arr);
   }
 
-  const endMs = tournament.end_date ? new Date(tournament.end_date).getTime() : Infinity;
-
   const pnlOf = (t: Mt5TradeRow) =>
     (Number(t.profit) || 0) + (Number(t.swap) || 0) + (Number(t.commission) || 0);
 
   const entries: LeaderboardEntry[] = regs.map((r) => {
     const m = machineById.get(r.machine_id);
     const accountId = accountByMachine.get(r.machine_id) ?? null;
-    const baselineAt = r.baseline_at ? new Date(r.baseline_at).getTime() : 0;
 
     // Tài khoản cent (USC) → MT5 báo tiền theo CENT; quy về USD canonical (chia 100).
     // Ưu tiên currency thật từ broker, fallback currency_unit của máy.
@@ -223,12 +221,8 @@ export async function computeLeaderboard(tournament: Tournament): Promise<Leader
     const depositUsd = (accountId ? depositRawByAccount.get(accountId) ?? 0 : 0) * moneyFactor;
     const denom = depositUsd > 0 ? depositUsd : Number(m?.capital) || Number(r.baseline_balance ?? 0) || 0;
 
-    // Chỉ lệnh ĐÃ ĐÓNG trong cửa sổ giải [baseline_at, end_date].
-    const trades = (accountId ? tradesByAccount.get(accountId) ?? [] : []).filter((t) => {
-      if (!t.time_close) return false;
-      const ts = new Date(t.time_close).getTime();
-      return ts >= baselineAt && ts <= endMs;
-    });
+    // ROI khớp MT5: tính TẤT CẢ lệnh đã đóng của account (không lọc cửa sổ giải).
+    const trades = accountId ? tradesByAccount.get(accountId) ?? [] : [];
     const pnl = trades.reduce((s, t) => s + pnlOf(t) * moneyFactor, 0);
     const tradeCount = trades.length;
     const wins = trades.filter((t) => pnlOf(t) > 0).length;
