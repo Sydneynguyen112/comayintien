@@ -21,7 +21,7 @@ export default function PendingPage() {
       if (cancelled) return;
       // Admin role bypass — không bao giờ pending
       if (user.role === "admin" || user.role === "super_admin") {
-        router.replace("/admin/crm");
+        router.replace("/admin/khach-hang");
         return;
       }
       if (s === "approved") {

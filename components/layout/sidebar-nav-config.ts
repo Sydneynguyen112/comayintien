@@ -4,7 +4,6 @@ import {
   Settings,
   FileBarChart,
   Users,
-  ChartLine,
   Coins,
   Trophy,
   HeartPulse,
@@ -33,7 +32,6 @@ export const studentNav: NavItem[] = clientMentorNav("client");
 export const mentorNav: NavItem[] = clientMentorNav("mentor");
 
 export const adminNav: NavItem[] = [
-  { href: "/admin/crm", label: "Dashboard", icon: ChartLine },
   { href: "/admin/khach-hang", label: "Quản lý cỗ máy", icon: Users },
   { href: "/admin/mt5/suc-khoe", label: "Sức khỏe khách hàng", icon: HeartPulse },
   { href: "/admin/giai-dau", label: "Giải đấu", icon: Trophy },

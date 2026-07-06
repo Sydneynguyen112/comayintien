@@ -7,8 +7,6 @@ import { invalidateLocalCache } from "@/lib/co-may/mock-data";
 import { hydrateFromCloud } from "@/lib/co-may/cloud-sync";
 import { getAccessStatus, touchLastSeen } from "@/lib/access-status";
 import { CoMayShell } from "@/components/co-may/co-may-shell";
-import { FeedbackButton } from "@/components/voc/feedback-button";
-import { NpsSurvey } from "@/components/voc/nps-survey";
 
 export default function ClientCoMayLayout({
   children,
@@ -55,11 +53,5 @@ export default function ClientCoMayLayout({
       </div>
     );
   }
-  return (
-    <>
-      <CoMayShell role="client">{children}</CoMayShell>
-      <FeedbackButton />
-      <NpsSurvey />
-    </>
-  );
+  return <CoMayShell role="client">{children}</CoMayShell>;
 }

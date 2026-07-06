@@ -19,7 +19,7 @@ function SignInPageInner() {
   const [loading, setLoading] = useState(false);
 
   function dashboardPath(role: string): string {
-    if (role === "admin" || role === "super_admin") return "/admin/crm";
+    if (role === "admin" || role === "super_admin") return "/admin/khach-hang";
     if (role === "mentor") return "/mentor/co-may/tong-quan";
     return "/client/co-may/tong-quan";
   }

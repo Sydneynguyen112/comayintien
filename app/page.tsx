@@ -19,7 +19,7 @@ export default function HomePage() {
           .eq("email", user.email)
           .single();
         const role = (data?.role as string | undefined) ?? "student";
-        if (role === "admin" || role === "super_admin") router.replace("/admin/crm");
+        if (role === "admin" || role === "super_admin") router.replace("/admin/khach-hang");
         else if (role === "mentor") router.replace("/mentor/co-may/tong-quan");
         else router.replace("/client/co-may/tong-quan");
         return;
@@ -33,7 +33,7 @@ export default function HomePage() {
           .maybeSingle();
         if (data) {
           const role = data.role as string;
-          if (role === "admin" || role === "super_admin") router.replace("/admin/crm");
+          if (role === "admin" || role === "super_admin") router.replace("/admin/khach-hang");
           else if (role === "mentor") router.replace("/mentor/co-may/tong-quan");
           else router.replace("/client/co-may/tong-quan");
           return;
