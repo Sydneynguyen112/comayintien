@@ -8,7 +8,7 @@
 Mình �ang s� hữu 2 sản phẩm web phục vụ c�ng ��ng Trader Vi�t:
 
 1. **ROVA LMS** (`https://lmsrova.vercel.app/`) � N�n tảng h�c Trading v�i design system **"Aurelian Academy"** (v� ng-kem-�en, sang tr�ng).
-2. **C� Máy Kinh Doanh** (`https://comayintien.vercel.app/`, repo `rova-co-may/`) � Tool quản tr� kỷ luật rút ti�n cho trader. **Hi�n tại �ang dùng Prisma + tRPC, cần migrate sang Supabase Client trực tiếp khi tích hợp v� o LMS.**
+2. **C� Máy Kinh Doanh** (`https://comaytrading.vercel.app/`, repo `rova-co-may/`) � Tool quản tr� kỷ luật rút ti�n cho trader. **Hi�n tại �ang dùng Prisma + tRPC, cần migrate sang Supabase Client trực tiếp khi tích hợp v� o LMS.**
 
 **Mục tiêu kép trong 1 lần:**
 1. � Migrate C� Máy: **Prisma + tRPC � Supabase Client trực tiếp**

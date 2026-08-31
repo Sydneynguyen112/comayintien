@@ -1,0 +1,7 @@
+[
+  {
+    "message": "Base UI error #31; visit https://base-ui.com/production-error?code=31 for the full message.",
+    "stack": "Error: Base UI error #31; visit https://base-ui.com/production-error?code=31 for the full message.\n    at https://lmsrova.vercel.app/_next/static/chunks/0lsha5lglc_1z.js:1:6615\n    at https://lmsrova.vercel.app/_next/static/chunks/0lsha5lglc_1z.js:1:6649\n    at ay (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:63845)\n    at oH (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:81849)\n    at iu (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:98940)\n    at sd (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:138944)\n    at https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:138789\n    at sf (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:138797)\n    at se (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:134718)\n    at sQ (https://lmsrova.vercel.app/_next/static/chunks/0.vk5f3.jcf8z.js:1:160616)",
+    "name": "Error"
+  }
+]

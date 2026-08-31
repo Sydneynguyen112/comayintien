@@ -1,5 +1,5 @@
 -- ============================================
--- ROVA LMS — Cỗ Máy In Tiền schema (MVP)
+-- ROVA LMS — Cỗ Máy Trading schema (MVP)
 -- Chạy SAU `supabase-setup.sql` (cần bảng `profiles` đã có)
 -- ============================================
 -- Drop nếu chạy lại

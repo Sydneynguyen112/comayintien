@@ -1,5 +1,5 @@
 -- ============================================================================
--- Giải đấu (Tournaments) — "Cỗ Máy In Tiền"
+-- Giải đấu (Tournaments) — "Cỗ Máy Trading"
 -- ============================================================================
 -- Chạy 1 lần trong Supabase SQL Editor TRƯỚC khi deploy code tournament.
 -- Idempotent: dùng IF NOT EXISTS.
